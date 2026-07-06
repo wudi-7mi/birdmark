@@ -1,0 +1,3 @@
+https://data.tpdc.ac.cn/zh-hans/data/c92d1e39-e821-4315-88c8-49386a5c5cfd
+https://github.com/zhanglu-cst/HIFSOD
+https://github.com/IIM-TTIJ/MVA2023SmallObjectDetection4SpottingBirds
