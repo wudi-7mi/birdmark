@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 from typing import Literal
 
 import numpy as np
@@ -16,6 +17,9 @@ ArrayColorOrder = Literal["bgr", "rgb"]
 InferenceMode = Literal["auto", "full", "tiled"]
 
 _MODEL_CACHE: dict[Path, YOLO] = {}
+_MODEL_LOCK = Lock()
+_TORCH_LOAD_PATCH_LOCK = Lock()
+_TORCH_LOAD_PATCHED = False
 
 
 @dataclass(frozen=True)
@@ -148,6 +152,32 @@ def detect_bird_crops(
         )
 
     return crops
+
+
+def preload_detection_model(
+    model_path: str | Path = DEFAULT_MODEL_PATH,
+) -> YOLO:
+    """Load the detector into the process cache before the first request."""
+    return _get_model(model_path)
+
+
+def warmup_detection_model(
+    *,
+    model_path: str | Path = DEFAULT_MODEL_PATH,
+    conf: float = 0.25,
+    iou: float = 0.7,
+    imgsz: int | None = None,
+) -> None:
+    """Run a tiny detector pass so first user inference does not pay setup cost."""
+    detect_bird_crops(
+        Image.new("RGB", (64, 64), "black"),
+        model_path=model_path,
+        conf=conf,
+        iou=iou,
+        imgsz=imgsz,
+        max_det=1,
+        mode="full",
+    )
 
 
 def _validate_options(
@@ -525,8 +555,53 @@ def _point_in_box(
 def _get_model(model_path: str | Path) -> YOLO:
     resolved_path = Path(model_path).expanduser().resolve()
     if resolved_path not in _MODEL_CACHE:
-        _MODEL_CACHE[resolved_path] = YOLO(str(resolved_path))
+        with _MODEL_LOCK:
+            if resolved_path not in _MODEL_CACHE:
+                _allow_trusted_ultralytics_checkpoint_load()
+                _MODEL_CACHE[resolved_path] = YOLO(str(resolved_path))
     return _MODEL_CACHE[resolved_path]
+
+
+def _allow_trusted_ultralytics_checkpoint_load() -> None:
+    """Keep local YOLO checkpoints loadable with PyTorch's safer defaults.
+
+    PyTorch 2.6 changed torch.load to default to weights_only=True. Some
+    Ultralytics checkpoints store a DetectionModel object and need the old
+    weights_only=False behavior. This app only loads the local configured
+    detector checkpoint, so we apply the compatibility patch before YOLO load.
+    """
+    global _TORCH_LOAD_PATCHED
+
+    if _TORCH_LOAD_PATCHED:
+        return
+
+    with _TORCH_LOAD_PATCH_LOCK:
+        if _TORCH_LOAD_PATCHED:
+            return
+
+        import inspect
+        import torch
+        import ultralytics.nn.tasks as tasks
+        import ultralytics.utils.patches as patches
+
+        if "weights_only" not in inspect.signature(torch.load).parameters:
+            _TORCH_LOAD_PATCHED = True
+            return
+
+        original_task_torch_load = tasks.torch_load
+        original_patch_torch_load = patches.torch_load
+
+        def task_torch_load(*args, **kwargs):
+            kwargs.setdefault("weights_only", False)
+            return original_task_torch_load(*args, **kwargs)
+
+        def patch_torch_load(*args, **kwargs):
+            kwargs.setdefault("weights_only", False)
+            return original_patch_torch_load(*args, **kwargs)
+
+        tasks.torch_load = task_torch_load
+        patches.torch_load = patch_torch_load
+        _TORCH_LOAD_PATCHED = True
 
 
 def _get_class_ids(model: YOLO, class_name: str) -> list[int]:
