@@ -36,7 +36,7 @@ from packages.birdmark_ml.birdcut import (
 )
 
 
-WEB_DIR = PROJECT_ROOT / "apps" / "web"
+WEB_DIR = PROJECT_ROOT / "apps" / "inference_web"
 RES_DIR = PROJECT_ROOT / "res"
 OUTPUT_DIR = RES_DIR / "service_runs"
 DEFAULT_DETECT_CONF = 0.04

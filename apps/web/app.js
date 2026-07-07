@@ -1,148 +1,266 @@
 (function () {
   const {
     Alert,
+    Avatar,
+    Badge,
     Button,
+    Divider,
+    Drawer,
     Empty,
+    Image,
+    Input,
+    InputNumber,
+    List,
+    Modal,
     Progress,
     Segmented,
-    Slider,
+    Space,
     Spin,
+    Statistic,
     Tag,
     Tooltip,
     Typography,
     Upload,
     message,
   } = antd;
+
   const iconSet = window.icons || {};
   const {
-    AimOutlined,
+    AppstoreOutlined,
+    BookOutlined,
+    CameraOutlined,
+    CheckCircleOutlined,
     CloudUploadOutlined,
+    DeleteOutlined,
+    FolderOpenOutlined,
+    LoginOutlined,
+    LogoutOutlined,
     ReloadOutlined,
-    ScissorOutlined,
+    UserOutlined,
   } = iconSet;
 
   const h = React.createElement;
-  const { useEffect, useMemo, useRef, useState } = React;
-  const { Text } = Typography;
+  const { Text, Title } = Typography;
+  const { useCallback, useEffect, useMemo, useState } = React;
+  const TOKEN_KEY = "birdmark_access_token";
+
+  function icon(IconComponent) {
+    return IconComponent ? h(IconComponent) : null;
+  }
 
   function App() {
-    const [file, setFile] = useState(null);
-    const [imageUrl, setImageUrl] = useState("");
-    const [mode, setMode] = useState("auto");
-    const [topK, setTopK] = useState(5);
-    const [loading, setLoading] = useState(false);
-    const [response, setResponse] = useState(null);
-    const [error, setError] = useState("");
-    const imageRef = useRef(null);
-    const cropperRef = useRef(null);
+    const [token, setToken] = useState(function () {
+      return localStorage.getItem(TOKEN_KEY) || "";
+    });
+    const [user, setUser] = useState(null);
+    const [booting, setBooting] = useState(Boolean(token));
+    const [active, setActive] = useState("feed");
+    const [loading, setLoading] = useState({});
+    const [feed, setFeed] = useState({ results: [], limit: 50, offset: 0 });
+    const [collection, setCollection] = useState([]);
+    const [myPhotos, setMyPhotos] = useState({ results: [], limit: 100, offset: 0 });
+    const [batches, setBatches] = useState({ results: [], limit: 50, offset: 0 });
+    const [selectedDetail, setSelectedDetail] = useState(null);
+    const [detailOpen, setDetailOpen] = useState(false);
+    const [selectedBatch, setSelectedBatch] = useState(null);
 
-    const fileName = file ? file.name : "No image selected";
-    const resultCount = response ? response.crop_count : 0;
-
-    useEffect(() => {
-      return function cleanup() {
-        if (imageUrl) URL.revokeObjectURL(imageUrl);
-        destroyCropper(cropperRef);
-      };
-    }, [imageUrl]);
-
-    useEffect(() => {
-      destroyCropper(cropperRef);
-      if (mode !== "manual" || !imageRef.current || !imageUrl) return;
-      cropperRef.current = new Cropper(imageRef.current, {
-        viewMode: 1,
-        dragMode: "crop",
-        autoCrop: true,
-        autoCropArea: 0.35,
-        responsive: true,
-        background: false,
-        movable: false,
-        rotatable: false,
-        scalable: false,
-        zoomable: true,
+    const setLoadingKey = useCallback(function (key, value) {
+      setLoading(function (current) {
+        return Object.assign({}, current, { [key]: value });
       });
-    }, [mode, imageUrl]);
+    }, []);
 
-    const uploadProps = useMemo(
-      function () {
-        return {
-          accept: "image/*",
-          maxCount: 1,
-          showUploadList: false,
-          beforeUpload: function (nextFile) {
-            const nextUrl = URL.createObjectURL(nextFile);
-            if (imageUrl) URL.revokeObjectURL(imageUrl);
-            setFile(nextFile);
-            setImageUrl(nextUrl);
-            setResponse(null);
-            setError("");
-            return false;
-          },
-        };
+    const clearSession = useCallback(function () {
+      localStorage.removeItem(TOKEN_KEY);
+      setToken("");
+      setUser(null);
+      setFeed({ results: [], limit: 50, offset: 0 });
+      setCollection([]);
+      setMyPhotos({ results: [], limit: 100, offset: 0 });
+      setBatches({ results: [], limit: 50, offset: 0 });
+      setSelectedDetail(null);
+      setDetailOpen(false);
+    }, []);
+
+    const request = useCallback(
+      async function (path, options) {
+        const nextOptions = options || {};
+        const headers = Object.assign({}, nextOptions.headers || {});
+        if (token) headers.Authorization = `Bearer ${token}`;
+
+        let body = nextOptions.body;
+        if (nextOptions.json !== undefined) {
+          headers["Content-Type"] = "application/json";
+          body = JSON.stringify(nextOptions.json);
+        }
+
+        const response = await fetch(path, {
+          method: nextOptions.method || "GET",
+          headers,
+          body,
+        });
+        const contentType = response.headers.get("content-type") || "";
+        const data = contentType.includes("application/json")
+          ? await response.json().catch(function () {
+              return {};
+            })
+          : await response.text();
+
+        if (response.status === 401) {
+          clearSession();
+        }
+        if (!response.ok) {
+          const error = new Error(formatApiError(data, response.status));
+          error.status = response.status;
+          error.data = data;
+          throw error;
+        }
+        return data;
       },
-      [imageUrl],
+      [clearSession, token],
     );
 
-    async function runAuto() {
-      if (!file) {
-        message.warning("Choose an image first.");
-        return;
-      }
-      setLoading(true);
-      setError("");
+    useEffect(
+      function () {
+        if (!token) {
+          setBooting(false);
+          return;
+        }
+        let cancelled = false;
+        setBooting(true);
+        request("/auth/me")
+          .then(function (data) {
+            if (!cancelled) setUser(data.user);
+          })
+          .catch(function () {
+            if (!cancelled) clearSession();
+          })
+          .finally(function () {
+            if (!cancelled) setBooting(false);
+          });
+        return function cleanup() {
+          cancelled = true;
+        };
+      },
+      [clearSession, request, token],
+    );
+
+    const loadFeed = useCallback(
+      async function () {
+        setLoadingKey("feed", true);
+        try {
+          setFeed(await request("/photos?limit=50&offset=0"));
+        } catch (err) {
+          message.error(err.message);
+        } finally {
+          setLoadingKey("feed", false);
+        }
+      },
+      [request, setLoadingKey],
+    );
+
+    const loadCollection = useCallback(
+      async function () {
+        setLoadingKey("collection", true);
+        try {
+          const data = await request("/me/collection");
+          setCollection(data.results || []);
+        } catch (err) {
+          message.error(err.message);
+        } finally {
+          setLoadingKey("collection", false);
+        }
+      },
+      [request, setLoadingKey],
+    );
+
+    const loadMyPhotos = useCallback(
+      async function () {
+        setLoadingKey("myPhotos", true);
+        try {
+          setMyPhotos(await request("/me/photos?limit=100&offset=0"));
+        } catch (err) {
+          message.error(err.message);
+        } finally {
+          setLoadingKey("myPhotos", false);
+        }
+      },
+      [request, setLoadingKey],
+    );
+
+    const loadBatches = useCallback(
+      async function () {
+        setLoadingKey("batches", true);
+        try {
+          setBatches(await request("/me/import-batches?limit=50&offset=0"));
+        } catch (err) {
+          message.error(err.message);
+        } finally {
+          setLoadingKey("batches", false);
+        }
+      },
+      [request, setLoadingKey],
+    );
+
+    useEffect(
+      function () {
+        if (!user) return;
+        if (active === "feed") loadFeed();
+        if (active === "collection") loadCollection();
+        if (active === "mine") loadMyPhotos();
+        if (active === "imports") loadBatches();
+      },
+      [active, loadBatches, loadCollection, loadFeed, loadMyPhotos, user],
+    );
+
+    async function openPhoto(photoId) {
+      setLoadingKey("detail", true);
       try {
-        const formData = new FormData();
-        formData.append("file", file);
-        const data = await postForm(`/analyze?top_k=${topK}`, formData);
-        setResponse(data);
+        const data = await request(`/photos/${photoId}`);
+        setSelectedDetail(data);
+        setDetailOpen(true);
       } catch (err) {
-        setError(err.message || "Analyze failed.");
+        message.error(err.message);
       } finally {
-        setLoading(false);
+        setLoadingKey("detail", false);
       }
     }
 
-    async function runManual() {
-      if (!file) {
-        message.warning("Choose an image first.");
-        return;
-      }
-      if (!cropperRef.current) {
-        message.warning("Draw a box around one bird.");
-        return;
-      }
-
-      const data = cropperRef.current.getData(true);
-      if (data.width < 5 || data.height < 5) {
-        message.warning("Selection is too small.");
-        return;
-      }
-
-      setLoading(true);
-      setError("");
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("x1", data.x);
-        formData.append("y1", data.y);
-        formData.append("x2", data.x + data.width);
-        formData.append("y2", data.y + data.height);
-        const result = await postForm(`/recognize-box?top_k=${topK}`, formData);
-        setResponse(result);
-      } catch (err) {
-        setError(err.message || "Recognition failed.");
-      } finally {
-        setLoading(false);
-      }
+    async function refreshDetail() {
+      if (!selectedDetail || !selectedDetail.photo) return;
+      const data = await request(`/photos/${selectedDetail.photo.id}`);
+      setSelectedDetail(data);
     }
 
-    function reset() {
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
-      destroyCropper(cropperRef);
-      setFile(null);
-      setImageUrl("");
-      setResponse(null);
-      setError("");
+    async function refreshAll() {
+      if (active === "feed") await loadFeed();
+      if (active === "collection") await loadCollection();
+      if (active === "mine") await loadMyPhotos();
+      if (active === "imports") await loadBatches();
+    }
+
+    async function logout() {
+      try {
+        if (token) await request("/auth/logout", { method: "POST" });
+      } catch (_) {
+        // Local logout should still succeed when the session is already invalid.
+      }
+      clearSession();
+    }
+
+    if (booting) {
+      return h("div", { className: "center-page" }, h(Spin, { size: "large" }));
+    }
+
+    if (!token || !user) {
+      return h(AuthScreen, {
+        onAuthed: function (data) {
+          localStorage.setItem(TOKEN_KEY, data.access_token);
+          setToken(data.access_token);
+          setUser(data.user);
+          setActive("feed");
+        },
+      });
     }
 
     return h(
@@ -154,248 +272,992 @@
         h(
           "div",
           { className: "brand" },
-          h("h1", { className: "brand-title" }, "Birdmark"),
+          h("div", { className: "brand-mark" }, icon(CameraOutlined)),
           h(
             "div",
-            { className: "brand-subtitle" },
-            "Upload an image, detect birds automatically, or select one bird manually.",
+            { className: "brand-copy" },
+            h("h1", null, "Birdmark"),
+            h("span", null, "鸟类识别相册"),
           ),
         ),
         h(
           "div",
-          { className: "timing-line" },
-          response &&
-            h(Tag, { color: "green" }, `${resultCount} crop${resultCount === 1 ? "" : "s"}`),
-          response &&
-            h(Tag, null, `Total ${formatSeconds(response.timing.total_seconds)}`),
-          response && response.device_name && h(Tag, null, response.device_name),
+          { className: "topbar-actions" },
+          h(Segmented, {
+            className: "main-nav",
+            value: active,
+            onChange: setActive,
+            options: [
+              { label: "共享", value: "feed", icon: icon(AppstoreOutlined) },
+              { label: "上传", value: "upload", icon: icon(CloudUploadOutlined) },
+              { label: "图鉴", value: "collection", icon: icon(BookOutlined) },
+              { label: "我的", value: "mine", icon: icon(UserOutlined) },
+              { label: "批量", value: "imports", icon: icon(FolderOpenOutlined) },
+            ],
+          }),
+          h(
+            "div",
+            { className: "user-pill" },
+            h(Avatar, { size: 28, icon: icon(UserOutlined) }),
+            h("span", null, user.display_name || user.username),
+          ),
+          h(
+            Tooltip,
+            { title: "退出登录" },
+            h(Button, { icon: icon(LogoutOutlined), onClick: logout }),
+          ),
         ),
       ),
       h(
         "main",
-        { className: "main-grid" },
+        { className: "page" },
+        active === "feed" &&
+          h(FeedView, {
+            data: feed,
+            loading: loading.feed,
+            onRefresh: loadFeed,
+            onOpenPhoto: openPhoto,
+          }),
+        active === "upload" &&
+          h(UploadView, {
+            request,
+            onOpenDetail: function (detail) {
+              setSelectedDetail(detail);
+              setDetailOpen(true);
+            },
+            onRefreshFeed: loadFeed,
+          }),
+        active === "collection" &&
+          h(CollectionView, {
+            items: collection,
+            loading: loading.collection,
+            onRefresh: loadCollection,
+          }),
+        active === "mine" &&
+          h(MyView, {
+            user,
+            data: myPhotos,
+            loading: loading.myPhotos,
+            request,
+            onRefresh: loadMyPhotos,
+            onOpenPhoto: openPhoto,
+          }),
+        active === "imports" &&
+          h(ImportView, {
+            data: batches,
+            loading: loading.batches,
+            request,
+            selectedBatch,
+            setSelectedBatch,
+            onRefresh: loadBatches,
+          }),
+      ),
+      h(PhotoDetailDrawer, {
+        detail: selectedDetail,
+        open: detailOpen,
+        loading: loading.detail,
+        currentUser: user,
+        request,
+        onClose: function () {
+          setDetailOpen(false);
+        },
+        onChanged: async function () {
+          await refreshDetail();
+          await refreshAll();
+        },
+      }),
+    );
+  }
+
+  function AuthScreen(props) {
+    const [mode, setMode] = useState("login");
+    const [loading, setLoading] = useState(false);
+    const [form, setForm] = useState({
+      identifier: "",
+      email: "",
+      username: "",
+      display_name: "",
+      password: "",
+    });
+
+    function update(key, value) {
+      setForm(function (current) {
+        return Object.assign({}, current, { [key]: value });
+      });
+    }
+
+    async function submit() {
+      setLoading(true);
+      try {
+        const path = mode === "login" ? "/auth/login" : "/auth/register";
+        const payload =
+          mode === "login"
+            ? { identifier: form.identifier, password: form.password }
+            : {
+                email: form.email,
+                username: form.username,
+                display_name: form.display_name,
+                password: form.password,
+              };
+        const response = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json().catch(function () {
+          return {};
+        });
+        if (!response.ok) throw new Error(formatApiError(data, response.status));
+        props.onAuthed(data);
+      } catch (err) {
+        message.error(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    return h(
+      "div",
+      { className: "auth-page" },
+      h(
+        "section",
+        { className: "auth-panel" },
         h(
-          "section",
-          { className: "panel" },
-          h(
-            "div",
-            { className: "panel-header" },
-            h("h2", { className: "panel-title" }, "Image"),
-            h(
-              Tooltip,
-              { title: "Clear image and results" },
-              h(Button, { icon: h(ReloadOutlined), onClick: reset }),
-            ),
-          ),
-          h(
-            "div",
-            { className: "panel-body" },
-            h(
-              Upload.Dragger,
-              uploadProps,
-              h("p", { className: "ant-upload-drag-icon" }, h(CloudUploadOutlined)),
-              h("p", { className: "ant-upload-text" }, "Click or drag an image here"),
-              h("p", { className: "ant-upload-hint" }, fileName),
-            ),
-            h(
-              "div",
-              { className: "control-row" },
-              h(Segmented, {
-                value: mode,
-                onChange: setMode,
-                options: [
-                  { label: "Auto", value: "auto", icon: h(AimOutlined) },
-                  { label: "Manual", value: "manual", icon: h(ScissorOutlined) },
-                ],
-              }),
-              h(
-                "div",
-                { className: "topk-control" },
-                h(Text, { type: "secondary" }, `Top ${topK}`),
-                h(Slider, {
-                  min: 1,
-                  max: 10,
-                  value: topK,
-                  onChange: setTopK,
-                  tooltip: { formatter: function (value) { return `Top ${value}`; } },
-                }),
-              ),
-              h(Button, {
-                type: "primary",
-                icon: mode === "auto" ? h(AimOutlined) : h(ScissorOutlined),
-                loading,
-                disabled: !file,
-                onClick: mode === "auto" ? runAuto : runManual,
-              }, mode === "auto" ? "Auto analyze" : "Recognize selection"),
-            ),
-            mode === "manual" &&
-              h(
-                "div",
-                { className: "manual-note" },
-                "Manual mode sends exactly one selected box for recognition.",
-              ),
-            h(
-              "div",
-              { className: "preview-frame" },
-              imageUrl
-                ? h("img", {
-                    ref: imageRef,
-                    src: imageUrl,
-                    alt: "Selected upload",
-                    onLoad: function () {
-                      if (mode === "manual") {
-                        destroyCropper(cropperRef);
-                        cropperRef.current = new Cropper(imageRef.current, {
-                          viewMode: 1,
-                          dragMode: "crop",
-                          autoCrop: true,
-                          autoCropArea: 0.35,
-                          responsive: true,
-                          background: false,
-                          movable: false,
-                          rotatable: false,
-                          scalable: false,
-                          zoomable: true,
-                        });
-                      }
-                    },
-                  })
-                : h(Empty, { description: "No image loaded" }),
-            ),
-          ),
+          "div",
+          { className: "auth-brand" },
+          h("div", { className: "brand-mark large" }, icon(CameraOutlined)),
+          h("div", null, h("h1", null, "Birdmark"), h("span", null, "鸟类识别相册")),
         ),
+        h(Segmented, {
+          block: true,
+          value: mode,
+          onChange: setMode,
+          options: [
+            { label: "登录", value: "login", icon: icon(LoginOutlined) },
+            { label: "注册", value: "register", icon: icon(UserOutlined) },
+          ],
+        }),
         h(
-          "section",
-          { className: "panel" },
-          h(
-            "div",
-            { className: "panel-header" },
-            h("h2", { className: "panel-title" }, "Birds"),
-            response &&
-              h(
-                "div",
-                { className: "timing-line" },
-                h("span", null, `Detect ${formatSeconds(response.timing.detect_seconds)}`),
-                h("span", null, `Recognize ${formatSeconds(response.timing.recognize_seconds)}`),
-              ),
-          ),
-          h(
-            "div",
-            { className: "panel-body" },
-            error && h(Alert, { type: "error", message: error, showIcon: true }),
-            loading && h("div", { className: "empty-state" }, h(Spin, { size: "large" })),
-            !loading && !response && !error && h(Empty, { className: "empty-state", description: "Results will appear here" }),
-            !loading && response && response.results.length === 0 &&
-              h(Empty, { className: "empty-state", description: "No birds found" }),
-            !loading && response && response.results.length > 0 &&
-              h(
-                "div",
-                { className: "result-list" },
-                response.results.map(function (item) {
-                  return h(ResultItem, { key: item.index, item });
+          "div",
+          { className: "auth-form" },
+          mode === "login"
+            ? h(Input, {
+                size: "large",
+                placeholder: "邮箱或用户名",
+                value: form.identifier,
+                onChange: function (event) {
+                  update("identifier", event.target.value);
+                },
+                onPressEnter: submit,
+              })
+            : h(
+                React.Fragment,
+                null,
+                h(Input, {
+                  size: "large",
+                  placeholder: "邮箱",
+                  value: form.email,
+                  onChange: function (event) {
+                    update("email", event.target.value);
+                  },
+                }),
+                h(Input, {
+                  size: "large",
+                  placeholder: "用户名",
+                  value: form.username,
+                  onChange: function (event) {
+                    update("username", event.target.value);
+                  },
+                }),
+                h(Input, {
+                  size: "large",
+                  placeholder: "昵称",
+                  value: form.display_name,
+                  onChange: function (event) {
+                    update("display_name", event.target.value);
+                  },
                 }),
               ),
+          h(Input.Password, {
+            size: "large",
+            placeholder: "密码",
+            value: form.password,
+            onChange: function (event) {
+              update("password", event.target.value);
+            },
+            onPressEnter: submit,
+          }),
+          h(
+            Button,
+            {
+              type: "primary",
+              size: "large",
+              block: true,
+              loading,
+              onClick: submit,
+            },
+            mode === "login" ? "登录" : "注册并进入",
           ),
         ),
       ),
     );
   }
 
-  function ResultItem(props) {
-    const item = props.item;
-    const predictions = item.predictions || [];
-    const best = predictions[0] || {};
-    const title = best.common_name || best.species || "Unknown bird";
-    const subtitle = best.common_name && best.species ? best.species : best.common_name || "";
-    const imageSrc = outputUrl(item.crop_path);
-    const source = item.source || (item.detection_confidence === null ? "manual" : "detector");
+  function FeedView(props) {
+    const results = props.data.results || [];
+    return h(
+      "section",
+      { className: "workbench" },
+      h(SectionHeader, {
+        title: "共享相册",
+        extra: h(Button, {
+          icon: icon(ReloadOutlined),
+          loading: props.loading,
+          onClick: props.onRefresh,
+        }),
+      }),
+      props.loading && !results.length
+        ? h("div", { className: "center-block" }, h(Spin))
+        : results.length
+          ? h(
+              "div",
+              { className: "photo-grid" },
+              results.map(function (item) {
+                return h(PhotoCard, {
+                  key: item.photo.id,
+                  item,
+                  onOpen: props.onOpenPhoto,
+                });
+              }),
+            )
+          : h(Empty, { className: "panel-empty", description: "还没有照片" }),
+    );
+  }
+
+  function UploadView(props) {
+    const [file, setFile] = useState(null);
+    const [preview, setPreview] = useState("");
+    const [topK, setTopK] = useState(5);
+    const [uploading, setUploading] = useState(false);
+
+    useEffect(
+      function () {
+        return function cleanup() {
+          if (preview) URL.revokeObjectURL(preview);
+        };
+      },
+      [preview],
+    );
+
+    const uploadProps = useMemo(
+      function () {
+        return {
+          accept: "image/*",
+          maxCount: 1,
+          showUploadList: false,
+          beforeUpload: function (nextFile) {
+            if (preview) URL.revokeObjectURL(preview);
+            setFile(nextFile);
+            setPreview(URL.createObjectURL(nextFile));
+            return false;
+          },
+        };
+      },
+      [preview],
+    );
+
+    async function upload() {
+      if (!file) {
+        message.warning("请选择图片");
+        return;
+      }
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const detail = await props.request(`/photos?top_k=${topK}`, {
+          method: "POST",
+          body: formData,
+        });
+        message.success("上传完成");
+        props.onOpenDetail(detail);
+        props.onRefreshFeed();
+      } catch (err) {
+        message.error(err.message);
+      } finally {
+        setUploading(false);
+      }
+    }
+
+    return h(
+      "section",
+      { className: "workbench upload-layout" },
+      h(
+        "div",
+        { className: "upload-panel" },
+        h(SectionHeader, { title: "上传识别" }),
+        h(
+          Upload.Dragger,
+          uploadProps,
+          h("p", { className: "ant-upload-drag-icon" }, icon(CloudUploadOutlined)),
+          h("p", { className: "ant-upload-text" }, "选择或拖入图片"),
+          h("p", { className: "ant-upload-hint" }, file ? file.name : "JPG、PNG、WEBP"),
+        ),
+        h(
+          "div",
+          { className: "upload-actions" },
+          h(
+            "label",
+            { className: "field-inline" },
+            h("span", null, "Top-K"),
+            h(InputNumber, {
+              min: 1,
+              max: 20,
+              value: topK,
+              onChange: function (value) {
+                setTopK(value || 5);
+              },
+            }),
+          ),
+          h(
+            Button,
+            {
+              type: "primary",
+              icon: icon(CloudUploadOutlined),
+              loading: uploading,
+              onClick: upload,
+            },
+            "上传并识别",
+          ),
+        ),
+      ),
+      h(
+        "div",
+        { className: "preview-panel" },
+        preview
+          ? h("img", { src: preview, alt: "待上传图片" })
+          : h(Empty, { description: "未选择图片" }),
+      ),
+    );
+  }
+
+  function CollectionView(props) {
+    return h(
+      "section",
+      { className: "workbench" },
+      h(SectionHeader, {
+        title: "我的图鉴",
+        extra: h(Button, {
+          icon: icon(ReloadOutlined),
+          loading: props.loading,
+          onClick: props.onRefresh,
+        }),
+      }),
+      props.loading && !props.items.length
+        ? h("div", { className: "center-block" }, h(Spin))
+        : props.items.length
+          ? h(
+              "div",
+              { className: "collection-grid" },
+              props.items.map(function (item) {
+                return h(
+                  "article",
+                  { className: "collection-card", key: item.id },
+                  imageOrPlaceholder(item.thumb_url || item.crop_url, item.common_name || item.scientific_name),
+                  h(
+                    "div",
+                    { className: "collection-body" },
+                    h("h3", null, item.chinese_name || item.common_name || item.scientific_name),
+                    item.scientific_name && h(Text, { type: "secondary" }, item.scientific_name),
+                    h(
+                      "div",
+                      { className: "metric-row" },
+                      h(Statistic, { title: "观察", value: item.observation_count || 0 }),
+                      h(Statistic, { title: "物种", value: item.species_id }),
+                    ),
+                  ),
+                );
+              }),
+            )
+          : h(Empty, { className: "panel-empty", description: "确认鉴定后会出现在这里" }),
+    );
+  }
+
+  function MyView(props) {
+    const rows = props.data.results || [];
+
+    async function deletePhoto(photoId) {
+      Modal.confirm({
+        title: "删除这张照片？",
+        content: "删除后会从共享相册和我的上传中移除。",
+        okText: "删除",
+        okType: "danger",
+        cancelText: "取消",
+        onOk: async function () {
+          try {
+            await props.request(`/photos/${photoId}`, { method: "DELETE" });
+            message.success("已删除");
+            props.onRefresh();
+          } catch (err) {
+            message.error(err.message);
+          }
+        },
+      });
+    }
+
+    return h(
+      "section",
+      { className: "workbench mine-layout" },
+      h(
+        "aside",
+        { className: "profile-panel" },
+        h(Avatar, { size: 52, icon: icon(UserOutlined) }),
+        h("h2", null, props.user.display_name || props.user.username),
+        h(Text, { type: "secondary" }, props.user.email),
+        h(Divider),
+        h("div", { className: "profile-row" }, h("span", null, "用户名"), h("b", null, props.user.username)),
+        h("div", { className: "profile-row" }, h("span", null, "角色"), h("b", null, props.user.role || "user")),
+      ),
+      h(
+        "div",
+        { className: "uploads-panel" },
+        h(SectionHeader, {
+          title: "我的上传",
+          extra: h(Button, {
+            icon: icon(ReloadOutlined),
+            loading: props.loading,
+            onClick: props.onRefresh,
+          }),
+        }),
+        props.loading && !rows.length
+          ? h("div", { className: "center-block" }, h(Spin))
+          : rows.length
+            ? h(
+                "div",
+                { className: "upload-list" },
+                rows.map(function (photo) {
+                  return h(
+                    "article",
+                    { className: "upload-row", key: photo.id },
+                    imageOrPlaceholder(photo.thumb_url || photo.original_url, photo.filename),
+                    h(
+                      "div",
+                      { className: "upload-row-main" },
+                      h("h3", null, photo.filename || `照片 #${photo.id}`),
+                      h(
+                        "div",
+                        { className: "tag-line" },
+                        h(Tag, { color: photo.status === "ready" ? "green" : "default" }, photo.status),
+                        h(Tag, null, formatDate(photo.created_at)),
+                      ),
+                    ),
+                    h(
+                      "div",
+                      { className: "row-actions" },
+                      h(Button, { onClick: function () { props.onOpenPhoto(photo.id); } }, "详情"),
+                      h(Button, {
+                        danger: true,
+                        icon: icon(DeleteOutlined),
+                        onClick: function () {
+                          deletePhoto(photo.id);
+                        },
+                      }),
+                    ),
+                  );
+                }),
+              )
+            : h(Empty, { className: "panel-empty", description: "还没有上传记录" }),
+      ),
+    );
+  }
+
+  function ImportView(props) {
+    const [files, setFiles] = useState([]);
+    const [creating, setCreating] = useState(false);
+    const [topK, setTopK] = useState(5);
+    const rows = props.data.results || [];
+
+    const uploadProps = {
+      accept: "image/*",
+      multiple: true,
+      showUploadList: false,
+      beforeUpload: function (file) {
+        setFiles(function (current) {
+          return current.concat(file);
+        });
+        return false;
+      },
+    };
+
+    async function createBatch() {
+      if (!files.length) {
+        message.warning("请选择图片");
+        return;
+      }
+      setCreating(true);
+      try {
+        const formData = new FormData();
+        files.forEach(function (file) {
+          formData.append("files", file);
+        });
+        const data = await props.request(`/import-batches?top_k=${topK}`, {
+          method: "POST",
+          body: formData,
+        });
+        props.setSelectedBatch(data);
+        setFiles([]);
+        await props.onRefresh();
+        message.success("批量任务已创建");
+      } catch (err) {
+        message.error(err.message);
+      } finally {
+        setCreating(false);
+      }
+    }
+
+    async function openBatch(batchId) {
+      try {
+        props.setSelectedBatch(await props.request(`/import-batches/${batchId}`));
+      } catch (err) {
+        message.error(err.message);
+      }
+    }
+
+    return h(
+      "section",
+      { className: "workbench imports-layout" },
+      h(
+        "div",
+        { className: "import-create" },
+        h(SectionHeader, { title: "批量导入" }),
+        h(
+          Upload.Dragger,
+          uploadProps,
+          h("p", { className: "ant-upload-drag-icon" }, icon(FolderOpenOutlined)),
+          h("p", { className: "ant-upload-text" }, "选择多张图片"),
+          h("p", { className: "ant-upload-hint" }, files.length ? `${files.length} 张待上传` : "最多 50 张"),
+        ),
+        h(
+          "div",
+          { className: "upload-actions" },
+          h(
+            "label",
+            { className: "field-inline" },
+            h("span", null, "Top-K"),
+            h(InputNumber, {
+              min: 1,
+              max: 20,
+              value: topK,
+              onChange: function (value) {
+                setTopK(value || 5);
+              },
+            }),
+          ),
+          h(Button, { onClick: function () { setFiles([]); } }, "清空"),
+          h(Button, { type: "primary", loading: creating, onClick: createBatch }, "创建任务"),
+        ),
+      ),
+      h(
+        "div",
+        { className: "import-list" },
+        h(SectionHeader, {
+          title: "任务记录",
+          extra: h(Button, {
+            icon: icon(ReloadOutlined),
+            loading: props.loading,
+            onClick: props.onRefresh,
+          }),
+        }),
+        rows.length
+          ? h(
+              "div",
+              { className: "batch-list" },
+              rows.map(function (batch) {
+                const percent = batch.total_count
+                  ? Math.round((batch.processed_count / batch.total_count) * 100)
+                  : 0;
+                return h(
+                  "article",
+                  { className: "batch-row", key: batch.id },
+                  h(
+                    "div",
+                    null,
+                    h("h3", null, `任务 #${batch.id}`),
+                    h(
+                      "div",
+                      { className: "tag-line" },
+                      renderBatchStatus(batch.status),
+                      h(Tag, null, formatDate(batch.created_at)),
+                    ),
+                  ),
+                  h(Progress, { percent, size: "small" }),
+                  h(
+                    "div",
+                    { className: "batch-counts" },
+                    h("span", null, `成功 ${batch.succeeded_count}`),
+                    h("span", null, `失败 ${batch.failed_count}`),
+                    h("span", null, `总数 ${batch.total_count}`),
+                  ),
+                  h(Button, { onClick: function () { openBatch(batch.id); } }, "查看"),
+                );
+              }),
+            )
+          : h(Empty, { className: "panel-empty", description: "还没有批量任务" }),
+      ),
+      props.selectedBatch &&
+        h(
+          "div",
+          { className: "batch-detail" },
+          h(SectionHeader, {
+            title: `任务 #${props.selectedBatch.batch.id}`,
+            extra: h(Button, {
+              icon: icon(ReloadOutlined),
+              onClick: function () {
+                openBatch(props.selectedBatch.batch.id);
+              },
+            }),
+          }),
+          h(
+            List,
+            {
+              dataSource: props.selectedBatch.items || [],
+              renderItem: function (item) {
+                return h(
+                  List.Item,
+                  null,
+                  h(
+                    List.Item.Meta,
+                    {
+                      avatar: item.photo
+                        ? h("img", {
+                            className: "tiny-thumb",
+                            src: item.photo.thumb_url || item.photo.original_url,
+                            alt: item.filename,
+                          })
+                        : h("div", { className: "tiny-thumb empty" }),
+                      title: item.filename || `条目 #${item.id}`,
+                      description: item.error_message || (item.photo ? `照片 #${item.photo.id}` : ""),
+                    },
+                  ),
+                  renderItemStatus(item.status),
+                );
+              },
+            },
+          ),
+        ),
+    );
+  }
+
+  function PhotoDetailDrawer(props) {
+    const detail = props.detail;
+    const [manualForms, setManualForms] = useState({});
+    const [actionLoading, setActionLoading] = useState("");
+
+    useEffect(
+      function () {
+        setManualForms({});
+      },
+      [detail && detail.photo && detail.photo.id],
+    );
+
+    if (!detail) return null;
+    const photo = detail.photo || {};
+    const observations = detail.observations || [];
+    const canEdit = props.currentUser && Number(photo.user_id) === Number(props.currentUser.id);
+
+    function updateManual(observationId, key, value) {
+      setManualForms(function (current) {
+        const next = Object.assign({}, current);
+        next[observationId] = Object.assign({}, next[observationId] || {}, { [key]: value });
+        return next;
+      });
+    }
+
+    async function runAction(key, fn) {
+      setActionLoading(key);
+      try {
+        await fn();
+        await props.onChanged();
+        message.success("已更新");
+      } catch (err) {
+        message.error(err.message);
+      } finally {
+        setActionLoading("");
+      }
+    }
+
+    return h(
+      Drawer,
+      {
+        title: photo.filename || `照片 #${photo.id}`,
+        width: 760,
+        open: props.open,
+        onClose: props.onClose,
+      },
+      props.loading
+        ? h("div", { className: "center-block" }, h(Spin))
+        : h(
+            "div",
+            { className: "detail-view" },
+            h(
+              "div",
+              { className: "detail-photo" },
+              imageOrPlaceholder(photo.original_url || photo.thumb_url, photo.filename),
+            ),
+            h(
+              "div",
+              { className: "detail-meta" },
+              h(Tag, null, photo.display_name || photo.username || "未知用户"),
+              h(Tag, { color: photo.status === "ready" ? "green" : "default" }, photo.status),
+              h(Tag, null, formatDate(photo.created_at)),
+            ),
+            observations.length
+              ? observations.map(function (observation) {
+                  const identification = observation.identification || {};
+                  const predictions = identification.top_k_results || [];
+                  const manual = manualForms[observation.id] || {};
+                  return h(
+                    "section",
+                    { className: "observation-panel", key: observation.id },
+                    h(
+                      "div",
+                      { className: "observation-head" },
+                      h("h3", null, `观察 #${observation.id}`),
+                      h(
+                        "div",
+                        { className: "tag-line" },
+                        h(Tag, { color: observation.status === "confirmed" ? "green" : "blue" }, observation.status),
+                        identification.status && h(Tag, null, identification.status),
+                      ),
+                    ),
+                    h(
+                      "div",
+                      { className: "observation-grid" },
+                      imageOrPlaceholder(observation.crop_url, `观察 #${observation.id}`),
+                      h(
+                        "div",
+                        { className: "prediction-list" },
+                        predictions.length
+                          ? predictions.map(function (prediction, index) {
+                              const name = formatPredictionName(prediction);
+                              const score = Math.round((prediction.score || 0) * 1000) / 10;
+                              return h(
+                                "div",
+                                { className: "prediction-row", key: `${observation.id}-${index}` },
+                                h(
+                                  "div",
+                                  { className: "prediction-main" },
+                                  h("strong", null, name),
+                                  h(Progress, { percent: score, size: "small" }),
+                                ),
+                                canEdit &&
+                                  h(
+                                    Button,
+                                    {
+                                      size: "small",
+                                      icon: icon(CheckCircleOutlined),
+                                      loading: actionLoading === `confirm-${observation.id}-${index}`,
+                                      onClick: function () {
+                                        runAction(`confirm-${observation.id}-${index}`, function () {
+                                          return props.request(`/observations/${observation.id}/confirm`, {
+                                            method: "POST",
+                                            json: { prediction_index: index },
+                                          });
+                                        });
+                                      },
+                                    },
+                                    "确认",
+                                  ),
+                              );
+                            })
+                          : h(Empty, { description: "没有建议" }),
+                      ),
+                    ),
+                    canEdit &&
+                      h(
+                        "div",
+                        { className: "manual-box" },
+                        h(Input, {
+                          placeholder: "学名",
+                          value: manual.scientific_name || "",
+                          onChange: function (event) {
+                            updateManual(observation.id, "scientific_name", event.target.value);
+                          },
+                        }),
+                        h(Input, {
+                          placeholder: "英文名",
+                          value: manual.common_name || "",
+                          onChange: function (event) {
+                            updateManual(observation.id, "common_name", event.target.value);
+                          },
+                        }),
+                        h(Input, {
+                          placeholder: "中文名",
+                          value: manual.chinese_name || "",
+                          onChange: function (event) {
+                            updateManual(observation.id, "chinese_name", event.target.value);
+                          },
+                        }),
+                        h(
+                          Button,
+                          {
+                            onClick: function () {
+                              if (!manual.scientific_name) {
+                                message.warning("请填写学名");
+                                return;
+                              }
+                              runAction(`manual-${observation.id}`, function () {
+                                return props.request(`/observations/${observation.id}/confirm`, {
+                                  method: "POST",
+                                  json: manual,
+                                });
+                              });
+                            },
+                            loading: actionLoading === `manual-${observation.id}`,
+                          },
+                          "手动确认",
+                        ),
+                        h(Button, {
+                          onClick: function () {
+                            runAction(`unknown-${observation.id}`, function () {
+                              return props.request(`/observations/${observation.id}/mark-unknown`, {
+                                method: "POST",
+                              });
+                            });
+                          },
+                          loading: actionLoading === `unknown-${observation.id}`,
+                        }, "未知"),
+                        h(Button, {
+                          danger: true,
+                          onClick: function () {
+                            runAction(`reject-${observation.id}`, function () {
+                              return props.request(`/observations/${observation.id}/reject`, {
+                                method: "POST",
+                              });
+                            });
+                          },
+                          loading: actionLoading === `reject-${observation.id}`,
+                        }, "误检"),
+                      ),
+                  );
+                })
+              : h(Empty, { description: "没有观察记录" }),
+          ),
+    );
+  }
+
+  function PhotoCard(props) {
+    const photo = props.item.photo || {};
+    const observations = props.item.observations || [];
+    const confirmedCount = observations.filter(function (item) {
+      return item.status === "confirmed";
+    }).length;
+    const firstIdentification = observations[0] && observations[0].identification;
+    const best = firstIdentification && firstIdentification.top_k_results && firstIdentification.top_k_results[0];
 
     return h(
       "article",
-      { className: "result-item" },
-      imageSrc
-        ? h("img", { className: "result-image", src: imageSrc, alt: title })
-        : h("div", { className: "result-image" }),
+      { className: "photo-card" },
+      h(
+        "button",
+        {
+          className: "photo-button",
+          type: "button",
+          onClick: function () {
+            props.onOpen(photo.id);
+          },
+        },
+        imageOrPlaceholder(photo.thumb_url || photo.original_url, photo.filename),
+      ),
       h(
         "div",
-        null,
-        h("h3", { className: "species-title" }, title),
-        subtitle && h(Text, { type: "secondary" }, subtitle),
+        { className: "photo-card-body" },
+        h("h3", null, best ? formatPredictionName(best) : photo.filename || `照片 #${photo.id}`),
         h(
           "div",
-          { className: "result-meta" },
-          h(Tag, null, `Box ${formatBox(item.box)}`),
-          renderSourceTag(source, item.detection_confidence),
+          { className: "tag-line" },
+          h(Tag, null, photo.display_name || photo.username || "未知用户"),
+          h(Tag, { color: photo.status === "ready" ? "green" : "default" }, photo.status),
+          confirmedCount > 0 && h(Tag, { color: "gold" }, `已确认 ${confirmedCount}`),
         ),
         h(
           "div",
-          null,
-          predictions.map(function (prediction, index) {
-            const name = prediction.common_name
-              ? `${prediction.common_name} (${prediction.species})`
-              : prediction.species || "Unknown";
-            return h(
-              "div",
-              { className: "prediction-row", key: `${name}-${index}` },
-              h("div", { className: "prediction-name", title: name }, name),
-              h(Progress, {
-                percent: Math.round((prediction.score || 0) * 1000) / 10,
-                size: "small",
-                status: "normal",
-              }),
-            );
-          }),
+          { className: "card-footer" },
+          h(Text, { type: "secondary" }, formatDate(photo.created_at)),
+          h(Button, {
+            size: "small",
+            onClick: function () {
+              props.onOpen(photo.id);
+            },
+          }, "详情"),
         ),
       ),
     );
   }
 
-  function renderSourceTag(source, confidence) {
-    if (source === "manual") return h(Tag, { color: "blue" }, "Manual");
-    if (source === "full_image") return h(Tag, { color: "orange" }, "Full image");
-    if (typeof confidence === "number") {
-      return h(Tag, { color: "green" }, `Detect ${(confidence * 100).toFixed(1)}%`);
+  function SectionHeader(props) {
+    return h(
+      "div",
+      { className: "section-header" },
+      h(Title, { level: 2 }, props.title),
+      props.extra || null,
+    );
+  }
+
+  function imageOrPlaceholder(src, alt) {
+    return src
+      ? h(Image, {
+          src,
+          alt: alt || "图片",
+          preview: false,
+          fallback: "",
+        })
+      : h(
+          "div",
+          { className: "image-placeholder" },
+          icon(CameraOutlined),
+        );
+  }
+
+  function renderBatchStatus(status) {
+    const color =
+      status === "completed"
+        ? "green"
+        : status === "completed_with_errors"
+          ? "orange"
+          : status === "failed"
+            ? "red"
+            : "blue";
+    return h(Tag, { color }, status);
+  }
+
+  function renderItemStatus(status) {
+    const color = status === "completed" ? "green" : status === "failed" ? "red" : "blue";
+    return h(Badge, { color, text: status });
+  }
+
+  function formatPredictionName(prediction) {
+    if (!prediction) return "未知鸟类";
+    const common = prediction.common_name;
+    const scientific = prediction.species || prediction.scientific_name;
+    if (common && scientific) return `${common} / ${scientific}`;
+    return common || scientific || "未知鸟类";
+  }
+
+  function formatApiError(data, status) {
+    if (data && typeof data === "object") {
+      if (typeof data.detail === "string") return data.detail;
+      if (data.detail && typeof data.detail.error === "string") return data.detail.error;
+      if (Array.isArray(data.detail)) return data.detail.map(function (item) { return item.msg || "请求错误"; }).join("；");
     }
-    return h(Tag, null, "Auto");
+    if (typeof data === "string" && data) return data;
+    return `请求失败：${status}`;
   }
 
-  async function postForm(url, formData) {
-    const response = await fetch(url, {
-      method: "POST",
-      body: formData,
-    });
-    const data = await response.json().catch(function () {
-      return {};
-    });
-    if (!response.ok) {
-      throw new Error(data.detail || `Request failed with ${response.status}`);
-    }
-    return data;
-  }
-
-  function destroyCropper(ref) {
-    if (ref.current) {
-      ref.current.destroy();
-      ref.current = null;
-    }
-  }
-
-  function outputUrl(path) {
-    if (!path) return "";
-    const normalized = path.replace(/\\/g, "/").replace(/^res\//, "");
-    return `/outputs/${normalized.split("/").map(encodeURIComponent).join("/")}`;
-  }
-
-  function formatSeconds(seconds) {
-    if (typeof seconds !== "number") return "0.00s";
-    return `${seconds.toFixed(2)}s`;
-  }
-
-  function formatBox(box) {
-    if (!Array.isArray(box)) return "";
-    return box.map(function (value) {
-      return Math.round(value);
-    }).join(", ");
+  function formatDate(value) {
+    if (!value) return "";
+    if (window.dayjs) return dayjs(value).format("YYYY-MM-DD HH:mm");
+    return String(value);
   }
 
   ReactDOM.createRoot(document.getElementById("root")).render(h(App));
