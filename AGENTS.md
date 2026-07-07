@@ -8,11 +8,15 @@ Birdmark 是一个自有鸟类识别相册应用。当前项目已经具备 Fast
 
 ## 仓库结构
 
-- `service.py`：FastAPI 服务和 HTTP 接口。
-- `birdcut.py`：YOLO 鸟类检测、裁剪和相关推理逻辑。
-- `bird_recognition.py`：BioCLIP 物种识别封装。
-- `main.py`：本地批量检测和识别脚本。
-- `web/`：当前由 FastAPI 挂载的前端页面。
+- `apps/inference/app/main.py`：AI 推理 FastAPI 服务和当前 Web 原型入口。
+- `apps/api/`：未来业务 API 服务。
+- `apps/web/`：当前由推理服务挂载的 Web 原型页面。
+- `apps/ios/`：未来 iOS App。
+- `packages/birdmark_ml/birdcut.py`：YOLO 鸟类检测、裁剪和相关推理逻辑。
+- `packages/birdmark_ml/bird_recognition.py`：BioCLIP 物种识别封装。
+- `packages/birdmark_common/`：未来共享工具。
+- `scripts/run_batch.py`：本地批量检测和识别脚本。
+- `scripts/`：下载、导出、评估和测试脚本。
 - `models/`：本地模型文件。除非用户明确要求，不要改写、删除或移动模型文件。
 - `datasets/`：本地数据集。按大型外部资产处理，不要做无关扫描、改写或清理。
 - `res/`、`logs/`、`runs/`：运行输出和生成文件。
@@ -34,10 +38,10 @@ Birdmark 是一个自有鸟类识别相册应用。当前项目已经具备 Fast
 - 后端应拆分为业务 API 服务和 AI 推理服务两个边界。
 - 业务 API 服务负责用户、图片、相册、图鉴、批量任务、数据库和客户端 API。
 - AI 推理服务负责 YOLO 检测、BioCLIP 识别、模型加载、GPU 管理和推理批处理。
-- 业务 API 服务不要直接 import `birdcut.py` 或 `bird_recognition.py`，应通过内部推理客户端调用 AI 推理服务。
-- 当前 `service.py` 可视为现有 AI 推理能力和 Web 演示入口，产品化时应逐步拆出独立业务 API。
-- 鸟类检测逻辑放在 `birdcut.py`。
-- 物种识别逻辑放在 `bird_recognition.py`。
+- 业务 API 服务不要直接 import `packages/birdmark_ml/birdcut.py` 或 `packages/birdmark_ml/bird_recognition.py`，应通过内部推理客户端调用 AI 推理服务。
+- 当前 `apps/inference/app/main.py` 可视为现有 AI 推理能力和 Web 演示入口，产品化时应逐步拆出独立业务 API。
+- 鸟类检测逻辑放在 `packages/birdmark_ml/birdcut.py`。
+- 物种识别逻辑放在 `packages/birdmark_ml/bird_recognition.py`。
 - 随着产品层增长，用户、图片、图鉴、批量任务等业务逻辑应逐步拆到独立模块。
 - 引入持久化时，优先考虑 SQLAlchemy 和 Alembic。
 - 开发期可以使用 SQLite，但模型设计应方便后续迁移到 PostgreSQL。
@@ -70,19 +74,19 @@ Birdmark 是一个自有鸟类识别相册应用。当前项目已经具备 Fast
 直接启动 API：
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn service:app --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn apps.inference.app.main:app --host 127.0.0.1 --port 8000
 ```
 
 运行本地批量流程：
 
 ```powershell
-.\.venv\Scripts\python.exe main.py
+.\.venv\Scripts\python.exe scripts\run_batch.py
 ```
 
 导出 TensorRT engine：
 
 ```powershell
-.\.venv\Scripts\python.exe export_tensorrt.py
+.\.venv\Scripts\python.exe scripts\export_tensorrt.py
 ```
 
 ## 验证要求

@@ -1,23 +1,28 @@
 from __future__ import annotations
 
 import logging
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from bird_recognition import (
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from packages.birdmark_ml.bird_recognition import (
     BirdSpeciesRecognizer,
     format_predictions,
     get_device_name,
     synchronize_if_needed,
 )
-from birdcut import BirdCrop, detect_bird_crops
+from packages.birdmark_ml.birdcut import BirdCrop, detect_bird_crops
 
 
-BIRD_DIR = Path("birds")
-LOG_DIR = Path("logs")
-OUTPUT_DIR = Path("res")
+BIRD_DIR = PROJECT_ROOT / "birds"
+LOG_DIR = PROJECT_ROOT / "logs"
+OUTPUT_DIR = PROJECT_ROOT / "res"
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 DETECT_CONF = 0.04

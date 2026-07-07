@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
+import sys
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -18,20 +19,26 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from bird_recognition import (
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from packages.birdmark_ml.bird_recognition import (
     BirdSpeciesRecognizer,
     Prediction,
     get_device_name,
     synchronize_if_needed,
 )
-from birdcut import (
+from packages.birdmark_ml.birdcut import (
     DEFAULT_DETECT_BATCH_SIZE,
     detect_bird_crops,
     warmup_detection_model,
 )
 
 
-OUTPUT_DIR = Path("res") / "service_runs"
+WEB_DIR = PROJECT_ROOT / "apps" / "web"
+RES_DIR = PROJECT_ROOT / "res"
+OUTPUT_DIR = RES_DIR / "service_runs"
 DEFAULT_DETECT_CONF = 0.04
 DEFAULT_DETECT_FALLBACK_CONF = 0.01
 DEFAULT_DETECT_IOU = 0.85
@@ -57,8 +64,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Birdmark AI Inference Service", version="1.1.0", lifespan=lifespan)
-app.mount("/static", StaticFiles(directory="web"), name="static")
-app.mount("/outputs", StaticFiles(directory="res", check_dir=False), name="outputs")
+app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+app.mount("/outputs", StaticFiles(directory=RES_DIR, check_dir=False), name="outputs")
 
 _recognizer: BirdSpeciesRecognizer | None = None
 _recognizer_lock = Lock()
@@ -235,7 +242,7 @@ class RecognitionBatcher:
 
 @app.get("/", response_class=HTMLResponse)
 def index() -> str:
-    index_path = Path("web") / "index.html"
+    index_path = WEB_DIR / "index.html"
     if not index_path.exists():
         raise HTTPException(status_code=404, detail="Frontend is not available")
     return index_path.read_text(encoding="utf-8")
@@ -957,4 +964,4 @@ def _get_recognizer() -> BirdSpeciesRecognizer:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("service:app", host="127.0.0.1", port=8000)
+    uvicorn.run("apps.inference.app.main:app", host="127.0.0.1", port=8000)

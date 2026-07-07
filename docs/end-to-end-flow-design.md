@@ -194,7 +194,7 @@ AI 推理服务负责模型和推理：
 - AI 推理服务可以是无状态服务，必要时只保留模型缓存和推理队列。
 - 图片文件由业务 API 服务统一存储和管理。
 
-当前已有的 `service.py` 更接近“AI 推理服务 + Web 演示页”的混合体。后续产品化时，应逐步拆分为：
+当前已有的 `apps/inference/app/main.py` 更接近“AI 推理服务 + Web 演示页”的混合体。后续产品化时，应逐步拆分为：
 
 - `app` 或 `backend`：业务 API 服务。
 - `inference_service` 或 `ai_service`：AI 推理服务。

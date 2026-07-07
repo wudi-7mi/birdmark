@@ -5,6 +5,7 @@ import csv
 import json
 import random
 import re
+import sys
 import time
 import unicodedata
 from collections import Counter, defaultdict
@@ -15,14 +16,22 @@ from typing import Iterable, Sequence
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps, UnidentifiedImageError
 
-from bird_recognition import BirdSpeciesRecognizer, get_device_name, synchronize_if_needed
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from packages.birdmark_ml.bird_recognition import (
+    BirdSpeciesRecognizer,
+    get_device_name,
+    synchronize_if_needed,
+)
 
 
-DEFAULT_BIRDS525_ROOT = Path("datasets") / "BIRDS-525-SPECIES-IMAGE-CLASSIFICATION-main"
-DEFAULT_CUB_ROOT = Path("datasets") / "CUB_200_2011" / "CUB_200_2011"
-DEFAULT_HIFSOD_ROOT = Path("datasets") / "HIFSOD"
+DEFAULT_BIRDS525_ROOT = PROJECT_ROOT / "datasets" / "BIRDS-525-SPECIES-IMAGE-CLASSIFICATION-main"
+DEFAULT_CUB_ROOT = PROJECT_ROOT / "datasets" / "CUB_200_2011" / "CUB_200_2011"
+DEFAULT_HIFSOD_ROOT = PROJECT_ROOT / "datasets" / "HIFSOD"
 DEFAULT_HIFSOD_ANN = DEFAULT_HIFSOD_ROOT / "new_annos" / "datasplit" / "8k.json"
-DEFAULT_OUTPUT_ROOT = Path("res") / "classification_eval"
+DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "res" / "classification_eval"
 
 
 @dataclass(frozen=True)

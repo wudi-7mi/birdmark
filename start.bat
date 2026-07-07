@@ -9,6 +9,11 @@ if not "%BIRDMARK_HOST%"=="" set "HOST=%BIRDMARK_HOST%"
 if not "%BIRDMARK_PORT%"=="" set "PORT=%BIRDMARK_PORT%"
 set "URL=http://%HOST%:%PORT%"
 set "PY=.venv\Scripts\python.exe"
+if "%PYTHONPATH%"=="" (
+  set "PYTHONPATH=%CD%"
+) else (
+  set "PYTHONPATH=%CD%;%PYTHONPATH%"
+)
 
 echo [Birdmark] Working directory: %CD%
 
@@ -29,7 +34,7 @@ echo [Birdmark] Checking service dependencies...
 "%PY%" -c "import fastapi, uvicorn; import multipart" >nul 2>&1
 if errorlevel 1 (
   echo [Birdmark] Installing service dependencies...
-  "%PY%" -m pip install -r requirements-service.txt
+  "%PY%" -m pip install -r apps\inference\requirements.txt
   if errorlevel 1 (
     echo [Birdmark] Failed to install service dependencies.
     pause
@@ -81,7 +86,7 @@ start "" powershell -NoProfile -WindowStyle Hidden -Command "$url='%URL%'; $heal
 :SkipBrowser
 
 echo [Birdmark] Starting service. Press Ctrl+C to stop.
-"%PY%" -m uvicorn service:app --host %HOST% --port %PORT%
+"%PY%" -m uvicorn apps.inference.app.main:app --host %HOST% --port %PORT%
 set "EXIT_CODE=%ERRORLEVEL%"
 
 echo.

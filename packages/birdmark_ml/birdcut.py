@@ -19,7 +19,8 @@ def _read_positive_int_env(name: str, default: int) -> int:
     return max(1, value)
 
 
-DEFAULT_MODEL_PT_PATH = Path(__file__).resolve().parent / "models" / "yolo26m.pt"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_MODEL_PT_PATH = PROJECT_ROOT / "models" / "yolo26m.pt"
 DEFAULT_MODEL_ENGINE_PATH = DEFAULT_MODEL_PT_PATH.with_suffix(".engine")
 DEFAULT_MODEL_PATH = Path(
     os.environ.get(
