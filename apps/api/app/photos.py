@@ -6,6 +6,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from .auth import CurrentUser, get_current_user
+from .collections import update_collection_entry
 from .database import (
     connect,
     dumps_json,
@@ -153,23 +154,104 @@ def get_photo(
     return _build_photo_response(photo, observations)
 
 
+@router.delete("/photos/{photo_id}")
+def delete_photo(
+    photo_id: int,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = int(current_user["id"])
+    with connect() as db:
+        photo = row_to_dict(
+            db.execute(
+                """
+                SELECT id
+                FROM photos
+                WHERE id = ? AND user_id = ? AND deleted_at IS NULL
+                """,
+                (photo_id, user_id),
+            ).fetchone()
+        )
+        if photo is None:
+            raise HTTPException(status_code=404, detail="Photo not found")
+
+        affected_species_ids = [
+            int(row["species_id"])
+            for row in db.execute(
+                """
+                SELECT DISTINCT identifications.confirmed_species_id AS species_id
+                FROM bird_observations AS observations
+                JOIN identifications
+                    ON identifications.observation_id = observations.id
+                WHERE observations.photo_id = ?
+                    AND observations.deleted_at IS NULL
+                    AND identifications.confirmed_species_id IS NOT NULL
+                """,
+                (photo_id,),
+            ).fetchall()
+        ]
+        db.execute(
+            """
+            UPDATE photos
+            SET status = 'deleted',
+                deleted_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (photo_id,),
+        )
+        db.execute(
+            """
+            UPDATE bird_observations
+            SET deleted_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE photo_id = ? AND deleted_at IS NULL
+            """,
+            (photo_id,),
+        )
+        updated_collection_entries = [
+            update_collection_entry(db, user_id=user_id, species_id=species_id)
+            for species_id in affected_species_ids
+        ]
+        db.commit()
+
+    return {
+        "status": "deleted",
+        "photo_id": photo_id,
+        "updated_collection_entries": updated_collection_entries,
+    }
+
+
 @router.get("/me/photos")
 def list_my_photos(
+    limit: int = Query(default=100, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    include_observations: bool = Query(default=False),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, Any]:
     with connect() as db:
         user_id = int(current_user["id"])
         rows = db.execute(
             """
-            SELECT *
+            SELECT photos.*, users.username, users.display_name
             FROM photos
-            WHERE user_id = ? AND deleted_at IS NULL
-            ORDER BY created_at DESC, id DESC
-            LIMIT 100
+            JOIN users ON users.id = photos.user_id
+            WHERE photos.user_id = ? AND photos.deleted_at IS NULL
+            ORDER BY photos.created_at DESC, photos.id DESC
+            LIMIT ? OFFSET ?
             """,
-            (user_id,),
+            (user_id, limit, offset),
         ).fetchall()
-    return {"results": [_format_photo(dict(row)) for row in rows]}
+        if include_observations:
+            results = [_build_photo_detail(db, row) for row in rows]
+        else:
+            results = [_format_photo(dict(row)) for row in rows]
+
+    return {
+        "results": results,
+        "limit": limit,
+        "offset": offset,
+        "next_offset": offset + len(results) if len(results) == limit else None,
+    }
 
 
 def _insert_photo(
