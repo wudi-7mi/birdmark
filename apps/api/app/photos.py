@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from .auth import CurrentUser, get_current_user
 from .database import (
@@ -18,6 +18,35 @@ from .storage import media_url, prepare_upload, save_crop_base64, save_original,
 
 
 router = APIRouter(tags=["photos"])
+
+
+@router.get("/photos")
+def list_photos(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    _ = current_user
+    with connect() as db:
+        rows = db.execute(
+            """
+            SELECT photos.*, users.username, users.display_name
+            FROM photos
+            JOIN users ON users.id = photos.user_id
+            WHERE photos.deleted_at IS NULL
+            ORDER BY photos.created_at DESC, photos.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset),
+        ).fetchall()
+        results = [_build_photo_detail(db, row) for row in rows]
+
+    return {
+        "results": results,
+        "limit": limit,
+        "offset": offset,
+        "next_offset": offset + len(results) if len(results) == limit else None,
+    }
 
 
 @router.post("/photos")
@@ -121,10 +150,7 @@ def get_photo(
             ).fetchall()
         ]
 
-    return {
-        "photo": _format_photo(photo),
-        "observations": observations,
-    }
+    return _build_photo_response(photo, observations)
 
 
 @router.get("/me/photos")
@@ -230,6 +256,24 @@ def _save_inference_result(
             (observation_id, dumps_json(predictions), suggested_species_id),
         )
 
+
+def _build_photo_detail(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
+    photo = dict(row)
+    observations = [
+        _build_observation(db, observation_row)
+        for observation_row in db.execute(
+            """
+            SELECT *
+            FROM bird_observations
+            WHERE photo_id = ? AND deleted_at IS NULL
+            ORDER BY id ASC
+            """,
+            (photo["id"],),
+        ).fetchall()
+    ]
+    return _build_photo_response(photo, observations)
+
+
 def _build_observation(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     observation = dict(row)
     identification = row_to_dict(
@@ -259,6 +303,16 @@ def _build_observation(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, An
         **observation,
         "crop_url": media_url(observation.get("crop_path")),
         "identification": identification,
+    }
+
+
+def _build_photo_response(
+    photo: dict[str, Any],
+    observations: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "photo": _format_photo(photo),
+        "observations": observations,
     }
 
 
