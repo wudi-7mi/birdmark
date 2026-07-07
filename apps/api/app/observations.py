@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from .auth import CurrentUser, get_current_user
 from .collections import update_collection_entry
-from .database import connect, get_default_user_id, loads_json, row_to_dict
+from .database import connect, loads_json, row_to_dict
 from .species import ensure_species, ensure_species_for_prediction
 from .storage import media_url
 
@@ -26,11 +27,12 @@ class ConfirmObservationRequest(BaseModel):
 def confirm_observation(
     observation_id: int,
     payload: ConfirmObservationRequest | None = None,
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, Any]:
     request = payload or ConfirmObservationRequest()
 
     with connect() as db:
-        user_id = get_default_user_id(db)
+        user_id = int(current_user["id"])
         observation = _get_owned_observation(db, observation_id, user_id)
         identification = _get_latest_identification(db, observation_id)
         if identification is None:
@@ -87,9 +89,12 @@ def confirm_observation(
 
 
 @router.post("/observations/{observation_id}/mark-unknown")
-def mark_observation_unknown(observation_id: int) -> dict[str, Any]:
+def mark_observation_unknown(
+    observation_id: int,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict[str, Any]:
     with connect() as db:
-        user_id = get_default_user_id(db)
+        user_id = int(current_user["id"])
         _get_owned_observation(db, observation_id, user_id)
         identification = _get_latest_identification(db, observation_id)
         if identification is None:
@@ -125,9 +130,12 @@ def mark_observation_unknown(observation_id: int) -> dict[str, Any]:
 
 
 @router.post("/observations/{observation_id}/reject")
-def reject_observation(observation_id: int) -> dict[str, Any]:
+def reject_observation(
+    observation_id: int,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict[str, Any]:
     with connect() as db:
-        user_id = get_default_user_id(db)
+        user_id = int(current_user["id"])
         _get_owned_observation(db, observation_id, user_id)
         identification = _get_latest_identification(db, observation_id)
         previous_species_id = (

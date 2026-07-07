@@ -3,12 +3,12 @@ from __future__ import annotations
 import sqlite3
 from typing import Annotated, Any
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
+from .auth import CurrentUser, get_current_user
 from .database import (
     connect,
     dumps_json,
-    get_default_user_id,
     loads_json,
     row_to_dict,
 )
@@ -24,6 +24,7 @@ router = APIRouter(tags=["photos"])
 def create_photo(
     file: Annotated[UploadFile, File()],
     top_k: int = 5,
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, Any]:
     contents = file.file.read()
     if not contents:
@@ -35,7 +36,7 @@ def create_photo(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     with connect() as db:
-        user_id = get_default_user_id(db)
+        user_id = int(current_user["id"])
         photo_id = _insert_photo(db, user_id=user_id, file=file, prepared=prepared)
         original_path = save_original(prepared, user_id=user_id, photo_id=photo_id)
         thumb_path = save_thumbnail(prepared, user_id=user_id, photo_id=photo_id)
@@ -83,11 +84,15 @@ def create_photo(
         )
         db.commit()
 
-    return get_photo(photo_id)
+    return get_photo(photo_id, current_user=current_user)
 
 
 @router.get("/photos/{photo_id}")
-def get_photo(photo_id: int) -> dict[str, Any]:
+def get_photo(
+    photo_id: int,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    _ = current_user
     with connect() as db:
         photo = row_to_dict(
             db.execute(
@@ -123,9 +128,11 @@ def get_photo(photo_id: int) -> dict[str, Any]:
 
 
 @router.get("/me/photos")
-def list_my_photos() -> dict[str, Any]:
+def list_my_photos(
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict[str, Any]:
     with connect() as db:
-        user_id = get_default_user_id(db)
+        user_id = int(current_user["id"])
         rows = db.execute(
             """
             SELECT *

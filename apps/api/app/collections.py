@@ -3,9 +3,10 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from .database import connect, get_default_user_id
+from .auth import CurrentUser, get_current_user
+from .database import connect
 from .storage import media_url
 
 
@@ -13,9 +14,11 @@ router = APIRouter(tags=["collections"])
 
 
 @router.get("/me/collection")
-def list_my_collection() -> dict[str, Any]:
+def list_my_collection(
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict[str, Any]:
     with connect() as db:
-        user_id = get_default_user_id(db)
+        user_id = int(current_user["id"])
         rows = db.execute(
             """
             SELECT
