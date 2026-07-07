@@ -1,16 +1,37 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
-from typing import Literal
+from typing import Literal, Sequence
 
 import numpy as np
 from PIL import Image, ImageOps
 from ultralytics import YOLO
 
 
-DEFAULT_MODEL_PATH = Path(__file__).resolve().parent / "models" / "yolo26m.pt"
+def _read_positive_int_env(name: str, default: int) -> int:
+    try:
+        value = int(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+    return max(1, value)
+
+
+DEFAULT_MODEL_PT_PATH = Path(__file__).resolve().parent / "models" / "yolo26m.pt"
+DEFAULT_MODEL_ENGINE_PATH = DEFAULT_MODEL_PT_PATH.with_suffix(".engine")
+DEFAULT_MODEL_PATH = Path(
+    os.environ.get(
+        "BIRDMARK_DETECT_MODEL",
+        str(
+            DEFAULT_MODEL_ENGINE_PATH
+            if DEFAULT_MODEL_ENGINE_PATH.exists()
+            else DEFAULT_MODEL_PT_PATH
+        ),
+    )
+)
+DEFAULT_DETECT_BATCH_SIZE = _read_positive_int_env("BIRDMARK_DETECT_BATCH_SIZE", 8)
 BIRD_CLASS_NAME = "bird"
 ImageInput = str | Path | Image.Image | np.ndarray
 ArrayColorOrder = Literal["bgr", "rgb"]
@@ -35,6 +56,19 @@ class _Detection:
     confidence: float
 
 
+@dataclass(frozen=True)
+class _TileInference:
+    image: Image.Image
+    left: int
+    top: int
+    right: int
+    bottom: int
+    keep_x1: float
+    keep_y1: float
+    keep_x2: float
+    keep_y2: float
+
+
 def birdcut(
     image: ImageInput,
     *,
@@ -49,6 +83,7 @@ def birdcut(
     tile_size: int = 1200,
     tile_overlap: float = 0.3,
     merge_iou: float = 0.45,
+    detect_batch_size: int = DEFAULT_DETECT_BATCH_SIZE,
 ) -> list[Image.Image]:
     """Detect birds in an image and return cropped bird images.
 
@@ -72,6 +107,7 @@ def birdcut(
             tile_size=tile_size,
             tile_overlap=tile_overlap,
             merge_iou=merge_iou,
+            detect_batch_size=detect_batch_size,
         )
     ]
 
@@ -90,6 +126,7 @@ def detect_bird_crops(
     tile_size: int = 1200,
     tile_overlap: float = 0.3,
     merge_iou: float = 0.45,
+    detect_batch_size: int = DEFAULT_DETECT_BATCH_SIZE,
 ) -> list[BirdCrop]:
     """Detect birds and return crops with box and confidence metadata."""
     _validate_options(
@@ -100,6 +137,7 @@ def detect_bird_crops(
         tile_size=tile_size,
         tile_overlap=tile_overlap,
         merge_iou=merge_iou,
+        detect_batch_size=detect_batch_size,
     )
 
     pil_image = _to_pil_image(image, array_color_order=array_color_order)
@@ -120,6 +158,7 @@ def detect_bird_crops(
             tile_size=tile_size,
             tile_overlap=tile_overlap,
             merge_iou=merge_iou,
+            detect_batch_size=detect_batch_size,
         )
     else:
         detections = _predict_full(
@@ -130,6 +169,7 @@ def detect_bird_crops(
             iou=iou,
             imgsz=imgsz,
             max_det=max_det,
+            detect_batch_size=detect_batch_size,
         )
 
     crops: list[BirdCrop] = []
@@ -167,6 +207,7 @@ def warmup_detection_model(
     conf: float = 0.25,
     iou: float = 0.7,
     imgsz: int | None = None,
+    detect_batch_size: int = DEFAULT_DETECT_BATCH_SIZE,
 ) -> None:
     """Run a tiny detector pass so first user inference does not pay setup cost."""
     detect_bird_crops(
@@ -177,6 +218,7 @@ def warmup_detection_model(
         imgsz=imgsz,
         max_det=1,
         mode="full",
+        detect_batch_size=detect_batch_size,
     )
 
 
@@ -189,6 +231,7 @@ def _validate_options(
     tile_size: int,
     tile_overlap: float,
     merge_iou: float,
+    detect_batch_size: int,
 ) -> None:
     if padding_ratio < 0:
         raise ValueError("padding_ratio must be >= 0")
@@ -204,6 +247,8 @@ def _validate_options(
         raise ValueError("tile_overlap must be >= 0 and < 1")
     if not 0 <= merge_iou <= 1:
         raise ValueError("merge_iou must be >= 0 and <= 1")
+    if detect_batch_size <= 0:
+        raise ValueError("detect_batch_size must be > 0")
 
 
 def _resolve_mode(
@@ -229,6 +274,7 @@ def _predict_full(
     iou: float,
     imgsz: int | None,
     max_det: int,
+    detect_batch_size: int,
 ) -> list[_Detection]:
     return _predict_image(
         model=model,
@@ -238,6 +284,7 @@ def _predict_full(
         iou=iou,
         imgsz=imgsz,
         max_det=max_det,
+        detect_batch_size=detect_batch_size,
     )
 
 
@@ -253,6 +300,7 @@ def _predict_tiled(
     tile_size: int,
     tile_overlap: float,
     merge_iou: float,
+    detect_batch_size: int,
 ) -> list[_Detection]:
     width, height = image.size
     stride = max(1, round(tile_size * (1 - tile_overlap)))
@@ -260,7 +308,7 @@ def _predict_tiled(
     y_origins = _tile_origins(height, tile_size, stride)
     x_keep_regions = _tile_keep_regions(width, x_origins, tile_size)
     y_keep_regions = _tile_keep_regions(height, y_origins, tile_size)
-    detections: list[_Detection] = []
+    tile_inputs: list[_TileInference] = []
 
     for y_index, top in enumerate(y_origins):
         keep_y1, keep_y2 = y_keep_regions[y_index]
@@ -268,37 +316,60 @@ def _predict_tiled(
             keep_x1, keep_x2 = x_keep_regions[x_index]
             right = min(width, left + tile_size)
             bottom = min(height, top + tile_size)
-            tile = image.crop((left, top, right, bottom))
-            tile_detections = _predict_image(
-                model=model,
-                image=tile,
-                class_ids=class_ids,
-                conf=conf,
-                iou=iou,
-                imgsz=imgsz,
-                max_det=max_det,
+            tile_inputs.append(
+                _TileInference(
+                    image=image.crop((left, top, right, bottom)),
+                    left=left,
+                    top=top,
+                    right=right,
+                    bottom=bottom,
+                    keep_x1=keep_x1,
+                    keep_y1=keep_y1,
+                    keep_x2=keep_x2,
+                    keep_y2=keep_y2,
+                )
             )
+
+    detections: list[_Detection] = []
+    for start in range(0, len(tile_inputs), detect_batch_size):
+        tile_batch = tile_inputs[start : start + detect_batch_size]
+        detections_by_tile = _predict_images(
+            model=model,
+            images=[tile.image for tile in tile_batch],
+            class_ids=class_ids,
+            conf=conf,
+            iou=iou,
+            imgsz=imgsz,
+            max_det=max_det,
+            detect_batch_size=detect_batch_size,
+        )
+        for tile, tile_detections in zip(tile_batch, detections_by_tile):
             for detection in tile_detections:
                 x1, y1, x2, y2 = detection.box
                 if _touches_internal_tile_edge(
                     detection.box,
-                    tile_width=right - left,
-                    tile_height=bottom - top,
-                    touches_image_left=left == 0,
-                    touches_image_top=top == 0,
-                    touches_image_right=right == width,
-                    touches_image_bottom=bottom == height,
+                    tile_width=tile.right - tile.left,
+                    tile_height=tile.bottom - tile.top,
+                    touches_image_left=tile.left == 0,
+                    touches_image_top=tile.top == 0,
+                    touches_image_right=tile.right == width,
+                    touches_image_bottom=tile.bottom == height,
                     margin=2.0,
                 ):
                     continue
 
-                global_box = (x1 + left, y1 + top, x2 + left, y2 + top)
+                global_box = (
+                    x1 + tile.left,
+                    y1 + tile.top,
+                    x2 + tile.left,
+                    y2 + tile.top,
+                )
                 if not _box_center_in_region(
                     global_box,
-                    x1=keep_x1,
-                    y1=keep_y1,
-                    x2=keep_x2,
-                    y2=keep_y2,
+                    x1=tile.keep_x1,
+                    y1=tile.keep_y1,
+                    x2=tile.keep_x2,
+                    y2=tile.keep_y2,
                 ):
                     continue
 
@@ -329,33 +400,67 @@ def _predict_image(
     iou: float,
     imgsz: int | None,
     max_det: int,
+    detect_batch_size: int,
 ) -> list[_Detection]:
+    detections_by_image = _predict_images(
+        model=model,
+        images=[image],
+        class_ids=class_ids,
+        conf=conf,
+        iou=iou,
+        imgsz=imgsz,
+        max_det=max_det,
+        detect_batch_size=detect_batch_size,
+    )
+    return detections_by_image[0] if detections_by_image else []
+
+
+def _predict_images(
+    *,
+    model: YOLO,
+    images: Sequence[Image.Image],
+    class_ids: list[int],
+    conf: float,
+    iou: float,
+    imgsz: int | None,
+    max_det: int,
+    detect_batch_size: int,
+) -> list[list[_Detection]]:
+    if not images:
+        return []
+
     predict_kwargs = {
-        "source": image,
+        "source": list(images),
         "classes": class_ids,
         "conf": conf,
         "iou": iou,
         "max_det": max_det,
+        "batch": min(detect_batch_size, len(images)),
         "verbose": False,
     }
     if imgsz is not None:
         predict_kwargs["imgsz"] = imgsz
 
     results = model.predict(**predict_kwargs)
-    if not results or results[0].boxes is None:
-        return []
+    detections_by_image: list[list[_Detection]] = []
+    for result in results:
+        boxes = result.boxes
+        if boxes is None:
+            detections_by_image.append([])
+            continue
 
-    detections: list[_Detection] = []
-    for box in results[0].boxes:
-        x1, y1, x2, y2 = box.xyxy[0].tolist()
-        detections.append(
-            _Detection(
-                box=(float(x1), float(y1), float(x2), float(y2)),
-                confidence=float(box.conf[0].item()),
+        detections: list[_Detection] = []
+        for box in boxes:
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            detections.append(
+                _Detection(
+                    box=(float(x1), float(y1), float(x2), float(y2)),
+                    confidence=float(box.conf[0].item()),
+                )
             )
-        )
+        detections_by_image.append(detections)
 
-    return detections
+    return detections_by_image
 
 
 def _tile_origins(length: int, tile_size: int, stride: int) -> list[int]:
@@ -557,8 +662,9 @@ def _get_model(model_path: str | Path) -> YOLO:
     if resolved_path not in _MODEL_CACHE:
         with _MODEL_LOCK:
             if resolved_path not in _MODEL_CACHE:
-                _allow_trusted_ultralytics_checkpoint_load()
-                _MODEL_CACHE[resolved_path] = YOLO(str(resolved_path))
+                if resolved_path.suffix.lower() == ".pt":
+                    _allow_trusted_ultralytics_checkpoint_load()
+                _MODEL_CACHE[resolved_path] = YOLO(str(resolved_path), task="detect")
     return _MODEL_CACHE[resolved_path]
 
 

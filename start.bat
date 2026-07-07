@@ -47,10 +47,20 @@ if errorlevel 1 (
   exit /b 1
 )
 
-if not exist "models\yolo26m.pt" (
-  echo [Birdmark] Missing model file: models\yolo26m.pt
+if not exist "models\yolo26m.pt" if not exist "models\yolo26m.engine" (
+  echo [Birdmark] Missing model file: models\yolo26m.pt or models\yolo26m.engine
   pause
   exit /b 1
+)
+
+if exist "models\yolo26m.engine" (
+  "%PY%" -c "import tensorrt" >nul 2>&1
+  if errorlevel 1 (
+    echo [Birdmark] Found models\yolo26m.engine, but TensorRT is not installed in .venv.
+    echo [Birdmark] Run: "%PY%" -m pip install tensorrt
+    pause
+    exit /b 1
+  )
 )
 
 if /I "%BIRDMARK_CHECK_ONLY%"=="1" (
