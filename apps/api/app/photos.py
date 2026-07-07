@@ -13,6 +13,7 @@ from .database import (
     row_to_dict,
 )
 from .inference_client import InferenceClientError, analyze_image
+from .species import ensure_species_for_prediction
 from .storage import media_url, prepare_upload, save_crop_base64, save_original, save_thumbnail
 
 
@@ -210,7 +211,7 @@ def _save_inference_result(
             )
 
         predictions = item.get("predictions") or []
-        suggested_species_id = _ensure_species_for_prediction(db, predictions[0]) if predictions else None
+        suggested_species_id = ensure_species_for_prediction(db, predictions[0]) if predictions else None
         db.execute(
             """
             INSERT INTO identifications (
@@ -222,50 +223,25 @@ def _save_inference_result(
             (observation_id, dumps_json(predictions), suggested_species_id),
         )
 
-
-def _ensure_species_for_prediction(
-    db: sqlite3.Connection,
-    prediction: dict[str, Any],
-) -> int | None:
-    scientific_name = prediction.get("species")
-    if not scientific_name:
-        return None
-
-    existing = db.execute(
-        "SELECT id FROM species WHERE scientific_name = ?",
-        (scientific_name,),
-    ).fetchone()
-    if existing is not None:
-        return int(existing["id"])
-
-    cursor = db.execute(
-        """
-        INSERT INTO species (
-            scientific_name, common_name, genus, family, source
-        )
-        VALUES (?, ?, ?, ?, 'bioclip')
-        """,
-        (
-            scientific_name,
-            prediction.get("common_name"),
-            prediction.get("genus"),
-            prediction.get("family"),
-        ),
-    )
-    return int(cursor.lastrowid)
-
-
 def _build_observation(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     observation = dict(row)
     identification = row_to_dict(
         db.execute(
             """
-            SELECT identifications.*, species.scientific_name, species.common_name
-            FROM identifications
-            LEFT JOIN species ON species.id = identifications.suggested_species_id
-            WHERE observation_id = ?
-            ORDER BY identifications.id DESC
-            LIMIT 1
+                SELECT
+                    identifications.*,
+                    suggested.scientific_name AS suggested_scientific_name,
+                    suggested.common_name AS suggested_common_name,
+                    confirmed.scientific_name AS confirmed_scientific_name,
+                    confirmed.common_name AS confirmed_common_name
+                FROM identifications
+                LEFT JOIN species AS suggested
+                    ON suggested.id = identifications.suggested_species_id
+                LEFT JOIN species AS confirmed
+                    ON confirmed.id = identifications.confirmed_species_id
+                WHERE observation_id = ?
+                ORDER BY identifications.id DESC
+                LIMIT 1
             """,
             (observation["id"],),
         ).fetchone()
