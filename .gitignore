@@ -3,6 +3,7 @@ logs/
 runs/
 models/
 res/
+storage/
 datasets/BIRDS-525-SPECIES-IMAGE-CLASSIFICATION-main/
 __pycache__
 datasets/
