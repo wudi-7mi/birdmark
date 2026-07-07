@@ -21,6 +21,13 @@ from .storage import media_url, prepare_upload, save_crop_base64, save_original,
 router = APIRouter(tags=["photos"])
 
 
+class PhotoAnalysisFailed(Exception):
+    def __init__(self, photo_id: int, message: str) -> None:
+        self.photo_id = photo_id
+        self.message = message
+        super().__init__(message)
+
+
 @router.get("/photos")
 def list_photos(
     limit: int = Query(default=50, ge=1, le=100),
@@ -57,62 +64,20 @@ def create_photo(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, Any]:
     contents = file.file.read()
-    if not contents:
-        raise HTTPException(status_code=400, detail="Uploaded file is empty")
-
     try:
-        prepared = prepare_upload(contents, file.filename)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    with connect() as db:
-        user_id = int(current_user["id"])
-        photo_id = _insert_photo(db, user_id=user_id, file=file, prepared=prepared)
-        original_path = save_original(prepared, user_id=user_id, photo_id=photo_id)
-        thumb_path = save_thumbnail(prepared, user_id=user_id, photo_id=photo_id)
-        db.execute(
-            """
-            UPDATE photos
-            SET original_path = ?, thumb_path = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """,
-            (original_path, thumb_path, photo_id),
-        )
-        db.commit()
-
-    try:
-        inference_result = analyze_image(
-            contents,
-            filename=file.filename or "upload",
+        photo_id = ingest_photo_contents(
+            user_id=int(current_user["id"]),
+            filename=file.filename,
+            contents=contents,
             top_k=top_k,
         )
-    except InferenceClientError as exc:
-        with connect() as db:
-            db.execute(
-                """
-                UPDATE photos
-                SET status = 'failed', error_message = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                """,
-                (str(exc), photo_id),
-            )
-            db.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PhotoAnalysisFailed as exc:
         raise HTTPException(
             status_code=502,
-            detail={"photo_id": photo_id, "error": str(exc)},
+            detail={"photo_id": exc.photo_id, "error": exc.message},
         ) from exc
-
-    with connect() as db:
-        _save_inference_result(db, user_id=user_id, photo_id=photo_id, result=inference_result)
-        db.execute(
-            """
-            UPDATE photos
-            SET status = 'ready', updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """,
-            (photo_id,),
-        )
-        db.commit()
 
     return get_photo(photo_id, current_user=current_user)
 
@@ -254,11 +219,75 @@ def list_my_photos(
     }
 
 
+def ingest_photo_contents(
+    *,
+    user_id: int,
+    filename: str | None,
+    contents: bytes,
+    top_k: int,
+) -> int:
+    if not contents:
+        raise ValueError("Uploaded file is empty")
+
+    prepared = prepare_upload(contents, filename)
+    with connect() as db:
+        photo_id = _insert_photo(
+            db,
+            user_id=user_id,
+            filename=filename,
+            prepared=prepared,
+        )
+        original_path = save_original(prepared, user_id=user_id, photo_id=photo_id)
+        thumb_path = save_thumbnail(prepared, user_id=user_id, photo_id=photo_id)
+        db.execute(
+            """
+            UPDATE photos
+            SET original_path = ?, thumb_path = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (original_path, thumb_path, photo_id),
+        )
+        db.commit()
+
+    try:
+        inference_result = analyze_image(
+            contents,
+            filename=filename or "upload",
+            top_k=top_k,
+        )
+    except InferenceClientError as exc:
+        with connect() as db:
+            db.execute(
+                """
+                UPDATE photos
+                SET status = 'failed', error_message = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (str(exc), photo_id),
+            )
+            db.commit()
+        raise PhotoAnalysisFailed(photo_id, str(exc)) from exc
+
+    with connect() as db:
+        _save_inference_result(db, user_id=user_id, photo_id=photo_id, result=inference_result)
+        db.execute(
+            """
+            UPDATE photos
+            SET status = 'ready', updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (photo_id,),
+        )
+        db.commit()
+
+    return photo_id
+
+
 def _insert_photo(
     db: sqlite3.Connection,
     *,
     user_id: int,
-    file: UploadFile,
+    filename: str | None,
     prepared,
 ) -> int:
     cursor = db.execute(
@@ -271,7 +300,7 @@ def _insert_photo(
         """,
         (
             user_id,
-            file.filename,
+            filename,
             "",
             "",
             prepared.content_hash,

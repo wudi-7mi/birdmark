@@ -10,6 +10,7 @@ from .auth import router as auth_router
 from .config import settings
 from .collections import router as collections_router
 from .database import initialize_database
+from .imports import router as imports_router
 from .observations import router as observations_router
 from .photos import router as photos_router
 
@@ -27,6 +28,7 @@ app.include_router(auth_router)
 app.include_router(photos_router)
 app.include_router(observations_router)
 app.include_router(collections_router)
+app.include_router(imports_router)
 
 
 @app.get("/health")
