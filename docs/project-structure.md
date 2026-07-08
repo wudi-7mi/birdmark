@@ -1,42 +1,39 @@
-# Birdmark 项目结构规划
+# Birdmark 项目结构
 
-## 目标
+## 当前定位
 
-项目将逐步从单目录脚本结构，整理为适合长期开发的多模块结构：
+当前仓库是 Birdmark 业务应用仓库，负责业务 API、Web 页面、数据持久化和后续 iOS 客户端规划。
 
-- `apps/api/`：业务 API 服务，负责用户、图片、图鉴、批量任务和数据库。
-- `apps/inference/`：AI 推理服务，负责 YOLO 检测、BioCLIP 识别、模型加载和推理队列。
-- `apps/web/`：当前 Web 原型。
-- `apps/ios/`：未来 iOS App。
-- `packages/birdmark_ml/`：可复用 ML 核心代码。
-- `packages/birdmark_common/`：未来业务 API 和推理服务共享工具。
-- `scripts/`：下载、导出、评估、批处理等命令行脚本。
+AI 推理服务、ML 核心代码、模型文件、训练/评估脚本已经拆分到独立仓库：
 
-`datasets/` 正在下载数据，整理项目结构时不要移动、清理或递归处理该目录。
+```text
+C:\Users\hg\project\birdmark-ai
+```
 
-## 规划结构
+## 当前结构
 
 ```text
 birdmark/
   AGENTS.md
   README.md
   .gitignore
-
-  docs/
-    development-roadmap.md
-    end-to-end-flow-design.md
-    project-structure.md
-    task-checklist.md
+  start-api.bat
 
   apps/
     api/
       app/
-
-    inference/
-      app/
+        auth.py
+        collections.py
+        config.py
+        database.py
+        imports.py
+        inference_client.py
         main.py
+        observations.py
+        photos.py
+        species.py
+        storage.py
       requirements.txt
-      requirements-tensorrt.txt
 
     web/
       index.html
@@ -45,34 +42,44 @@ birdmark/
 
     ios/
 
-  packages/
-    birdmark_ml/
-      birdcut.py
-      bird_recognition.py
+  docs/
+    development-roadmap.md
+    end-to-end-flow-design.md
+    ios-app-v1-design.md
+    project-structure.md
+    task-checklist.md
 
-    birdmark_common/
-
-  scripts/
-    run_batch.py
-    download_tpdc_birds.py
-    export_tensorrt.py
-    evaluate_classification.py
-    yolotest.py
-
-  models/
   datasets/
   storage/
   res/
   logs/
   runs/
-  birds/
 ```
 
-## 迁移原则
+## 已迁移到 AI 仓库的内容
 
-- 不移动 `datasets/`。
-- 不移动 `models/`。
-- 不清理 `res/`、`logs/`、`runs/`、`birds/`。
-- 根目录保留 `start.bat` 作为本地启动入口。
-- 业务 API 与 AI 推理服务分开生长。
-- 当前优先保证 AI 推理服务和 Web 原型迁移后仍可启动。
+以下内容不再保留在当前业务仓库：
+
+- `apps/inference/`
+- `apps/inference_web/`
+- `packages/birdmark_ml/`
+- `packages/birdmark_common/`
+- `scripts/`
+- `models/`
+- `birds/`
+- `start.bat`
+
+对应内容位于：
+
+```text
+C:\Users\hg\project\birdmark-ai
+```
+
+## 边界原则
+
+- 当前仓库不直接加载模型。
+- 当前仓库不直接 import YOLO、BioCLIP、torch 或 TensorRT 相关模块。
+- 当前仓库通过 `apps/api/app/inference_client.py` 调用外部 AI 推理服务。
+- AI 服务地址通过 `BIRDMARK_INFERENCE_URL` 配置，默认是 `http://127.0.0.1:8000`。
+- `datasets/` 暂时仍留在当前工作区，不移动、不清理、不递归处理。
+- `storage/`、`res/`、`logs/`、`runs/` 是本地运行产物，不做无关清理。

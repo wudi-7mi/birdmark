@@ -1,1 +1,0 @@
-"""Birdmark AI inference application."""

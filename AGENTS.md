@@ -2,31 +2,39 @@
 
 ## 项目概览
 
-Birdmark 是一个自有鸟类识别相册应用。当前项目已经具备 FastAPI 后端、轻量 React/Ant Design 前端、YOLO 鸟类检测和 BioCLIP 物种识别能力。
+Birdmark 是一个自有鸟类识别相册应用。当前仓库是业务应用仓库，负责 FastAPI 业务 API、轻量 React/Ant Design Web 页面、用户、图片、观察记录、鉴定确认、个人图鉴和批量导入任务。
 
-长期产品目标是支持多用户：用户可以上传鸟类图片，运行自动鉴定，确认或修正结果，并将确认后的观察记录保存到自己的鸟类收集图鉴中。登录用户之间可以浏览彼此上传的图片和鉴定结果。
+AI 推理服务、模型文件、训练/评估脚本和 ML 封装已经拆分到独立仓库：
+
+```text
+C:\Users\hg\project\birdmark-ai
+```
+
+当前仓库不再保存 YOLO、BioCLIP、TensorRT engine、模型导出脚本或数据集处理脚本。业务 API 通过 HTTP 调用外部 AI 推理服务。
 
 ## 仓库结构
 
-- `apps/inference/app/main.py`：AI 推理 FastAPI 服务和当前 Web 原型入口。
-- `apps/api/`：未来业务 API 服务。
-- `apps/web/`：当前由推理服务挂载的 Web 原型页面。
+- `apps/api/`：业务 API 服务，负责用户、图片、图鉴、批量任务、数据库和客户端 API。
+- `apps/web/`：业务 Web 页面，由业务 API 挂载。
 - `apps/ios/`：未来 iOS App。
-- `packages/birdmark_ml/birdcut.py`：YOLO 鸟类检测、裁剪和相关推理逻辑。
-- `packages/birdmark_ml/bird_recognition.py`：BioCLIP 物种识别封装。
-- `packages/birdmark_common/`：未来共享工具。
-- `scripts/run_batch.py`：本地批量检测和识别脚本。
-- `scripts/`：下载、导出、评估和测试脚本。
-- `models/`：本地模型文件。除非用户明确要求，不要改写、删除或移动模型文件。
-- `datasets/`：本地数据集。按大型外部资产处理，不要做无关扫描、改写或清理。
-- `res/`、`logs/`、`runs/`：运行输出和生成文件。
 - `docs/`：产品规划、架构设计和开发路线文档。
+- `storage/`：本地 SQLite、上传图片和生成媒体，通常不提交。
+- `datasets/`：本地数据集。按大型外部资产处理，不要做无关扫描、改写或清理。
+
+已迁移到 `birdmark-ai` 的内容：
+
+- `apps/inference/`
+- `apps/inference_web/`
+- `packages/birdmark_ml/`
+- `scripts/`
+- `models/`
+- `birds/`
+- `start.bat`
 
 ## 工作原则
 
 - 默认使用中文和用户沟通。
-- 优先保留现有检测和识别流程，除非任务明确要求调整 ML 行为。
-- 以小步产品化为主线：数据持久化、多用户、相册、图鉴、批量任务。
+- 当前仓库聚焦业务产品化：数据持久化、多用户、相册、图鉴、批量任务、Web/iOS 客户端。
 - AI 鉴定结果默认是“建议”，不要直接等同于用户确认的最终鉴定。
 - 原图、裁剪图、检测框、AI Top-K 结果和用户确认结果需要能互相追溯。
 - 数据库中保存图片路径和元数据，不直接保存图片二进制。
@@ -35,77 +43,69 @@ Birdmark 是一个自有鸟类识别相册应用。当前项目已经具备 Fast
 
 ## 后端约定
 
-- 后端应拆分为业务 API 服务和 AI 推理服务两个边界。
 - 业务 API 服务负责用户、图片、相册、图鉴、批量任务、数据库和客户端 API。
-- AI 推理服务负责 YOLO 检测、BioCLIP 识别、模型加载、GPU 管理和推理批处理。
-- 业务 API 服务不要直接 import `packages/birdmark_ml/birdcut.py` 或 `packages/birdmark_ml/bird_recognition.py`，应通过内部推理客户端调用 AI 推理服务。
-- 当前 `apps/inference/app/main.py` 可视为现有 AI 推理能力和 Web 演示入口，产品化时应逐步拆出独立业务 API。
-- 鸟类检测逻辑放在 `packages/birdmark_ml/birdcut.py`。
-- 物种识别逻辑放在 `packages/birdmark_ml/bird_recognition.py`。
-- 随着产品层增长，用户、图片、图鉴、批量任务等业务逻辑应逐步拆到独立模块。
-- 引入持久化时，优先考虑 SQLAlchemy 和 Alembic。
+- AI 推理服务在 `birdmark-ai` 仓库维护。
+- 当前仓库不要直接 import AI/ML 模块，也不要重新引入模型加载逻辑。
+- 当前仓库通过 `apps/api/app/inference_client.py` 调用外部 AI 推理服务。
+- 外部 AI 服务地址由 `BIRDMARK_INFERENCE_URL` 配置，默认是 `http://127.0.0.1:8000`。
+- 随着产品层增长，用户、图片、图鉴、批量任务等业务逻辑应继续拆到独立模块。
+- 引入持久化迁移时，优先考虑 SQLAlchemy 和 Alembic。
 - 开发期可以使用 SQLite，但模型设计应方便后续迁移到 PostgreSQL。
 - 批量导入正式化时，应考虑任务表和后台队列，不要长期依赖单次 HTTP 请求完成大批量处理。
 
 ## 前端约定
 
-- 当前前端使用 React CDN、Ant Design 和 CropperJS。
+- 当前前端使用 React CDN 和 Ant Design CDN。
 - 未明确要求迁移前端工程时，保持现有前端技术栈和视觉风格。
 - 不要把应用首页改成营销落地页；第一屏应优先是可用的上传、识别、浏览或管理界面。
 - 页面设计应服务核心流程：上传、鉴定、确认、浏览、个人图鉴、批量导入。
-- 修改前端后，应尽量人工验证上传和识别主流程。
+- 修改前端后，应尽量人工验证登录、上传、识别、确认和图鉴主流程。
 
-## ML 运行说明
+## 外部 AI 服务说明
 
-- YOLO 检测模型可能是 `.pt` 或 `.engine`。
-- TensorRT engine 依赖本机 TensorRT 运行环境。
-- BioCLIP 和 torch 在 GPU 上性能更好，但代码需要能处理 CPU 环境。
-- 识别服务已有锁和批处理队列，修改并发相关逻辑时要谨慎。
-- 不要随意修改默认置信度、IoU、图片尺寸和 batch size，除非任务明确涉及识别质量或性能调优。
+- AI 推理服务负责 YOLO 检测、BioCLIP 识别、模型加载、GPU 管理和推理批处理。
+- 当前仓库只依赖 AI 服务返回的检测框、crop 图、Top-K 识别结果和推理元数据。
+- 如果本地没有启动 `birdmark-ai`，上传识别接口可能返回 502。
+- 调整识别质量、模型参数、TensorRT、训练/评估脚本时，应在 `birdmark-ai` 仓库处理。
 
 ## 常用命令
 
-启动应用：
+启动业务 API：
 
 ```powershell
+.\start-api.bat
+```
+
+直接启动业务 API：
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn apps.api.app.main:app --host 127.0.0.1 --port 8100
+```
+
+启动外部 AI 服务：
+
+```powershell
+cd C:\Users\hg\project\birdmark-ai
 .\start.bat
-```
-
-直接启动 API：
-
-```powershell
-.\.venv\Scripts\python.exe -m uvicorn apps.inference.app.main:app --host 127.0.0.1 --port 8000
-```
-
-运行本地批量流程：
-
-```powershell
-.\.venv\Scripts\python.exe scripts\run_batch.py
-```
-
-导出 TensorRT engine：
-
-```powershell
-.\.venv\Scripts\python.exe scripts\export_tensorrt.py
 ```
 
 ## 验证要求
 
 - 修改后端接口后，优先做服务导入检查或启动检查。
-- 修改识别流程后，尽量用示例图片验证检测和识别结果。
-- 修改前端后，尽量在浏览器中验证上传、自动识别、手动框选和结果展示。
-- 如果本机缺少 ML 依赖、模型文件或 GPU 运行环境，要明确说明验证受限。
+- 修改前端后，尽量在浏览器中验证登录、上传、识别、确认和结果展示。
+- 修改调用 AI 服务的协议后，需要同时检查 `birdmark-ai` 的接口兼容性。
+- 如果本机未启动外部 AI 服务，要明确说明上传识别验证受限。
 - 不要声称测试通过，除非确实运行过对应命令。
 
 ## 文档约定
 
 - 产品规划和阶段路线放在 `docs/`。
-- 当产品方向、架构选择或阶段计划发生变化时，更新 `docs/development-roadmap.md`。
+- 当产品方向、架构选择或阶段计划发生变化时，更新 `docs/development-roadmap.md` 或相关设计文档。
 - README 类使用说明、内部规划文档和 Codex 工作约定应保持分离。
 
 ## 文件和数据安全
 
-- 不要删除用户上传图片、数据集、模型文件、生成结果或日志，除非用户明确要求。
-- 不要对 `models/`、`datasets/`、`res/`、`runs/` 做批量清理操作，除非任务明确要求。
+- 不要删除用户上传图片、数据集、生成结果或日志，除非用户明确要求。
+- 不要对 `datasets/`、`storage/`、`res/`、`runs/` 做批量清理操作，除非任务明确要求。
 - 处理大文件目录时，优先读取目录摘要，不要无目的递归读取全部内容。
 - 新增依赖前，应确认它对项目阶段确实必要。
