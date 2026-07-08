@@ -3,6 +3,12 @@ setlocal
 
 cd /d "%~dp0"
 
+if exist ".env" (
+  for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do (
+    if not "%%A"=="" if not defined %%A set "%%A=%%B"
+  )
+)
+
 set "HOST=127.0.0.1"
 set "PORT=8100"
 if not "%BIRDMARK_API_HOST%"=="" set "HOST=%BIRDMARK_API_HOST%"

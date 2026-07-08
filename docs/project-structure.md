@@ -7,7 +7,7 @@
 AI 推理服务、ML 核心代码、模型文件、训练/评估脚本已经拆分到独立仓库：
 
 ```text
-C:\Users\hg\project\birdmark-ai
+../birdmark-ai
 ```
 
 ## 当前结构
@@ -16,8 +16,11 @@ C:\Users\hg\project\birdmark-ai
 birdmark/
   AGENTS.md
   README.md
+  .env.example
+  .gitattributes
   .gitignore
   start-api.bat
+  start-api.sh
 
   apps/
     api/
@@ -72,7 +75,7 @@ birdmark/
 对应内容位于：
 
 ```text
-C:\Users\hg\project\birdmark-ai
+../birdmark-ai
 ```
 
 ## 边界原则
@@ -81,5 +84,8 @@ C:\Users\hg\project\birdmark-ai
 - 当前仓库不直接 import YOLO、BioCLIP、torch 或 TensorRT 相关模块。
 - 当前仓库通过 `apps/api/app/inference_client.py` 调用外部 AI 推理服务。
 - AI 服务地址通过 `BIRDMARK_INFERENCE_URL` 配置，默认是 `http://127.0.0.1:8000`。
+- 业务 API 可通过 `start-api.bat` 在 Windows 启动，通过 `start-api.sh` 在 macOS/Linux 启动。
+- 运行配置可以写入 `.env`，也可以由系统环境变量注入；系统环境变量优先级更高。
+- `BIRDMARK_STORAGE_ROOT` 和 `BIRDMARK_DATABASE_PATH` 可指向仓库外的持久化目录，便于 macOS/Linux 服务器部署。
 - `datasets/` 暂时仍留在当前工作区，不移动、不清理、不递归处理。
 - `storage/`、`res/`、`logs/`、`runs/` 是本地运行产物，不做无关清理。
