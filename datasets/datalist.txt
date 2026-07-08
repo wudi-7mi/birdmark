@@ -1,7 +1,0 @@
-https://github.com/LeeYi-user/BIRDS-525-SPECIES-IMAGE-CLASSIFICATION
-https://www.vision.caltech.edu/datasets/cub_200_2011/
-https://github.com/zhanglu-cst/HIFSOD
-https://huggingface.co/datasets/ba188/inaturalist
-https://github.com/visipedia/inat_comp
-
-https://www.inaturalist.org/pages/range_maps
