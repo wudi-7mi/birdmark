@@ -14,13 +14,15 @@ def analyze_image(
     *,
     filename: str,
     top_k: int = 5,
+    include_crop_images: bool = True,
+    full_image_fallback: bool = False,
 ) -> dict[str, object]:
     url = f"{settings.inference_base_url}/internal/analyze-image"
     files = {"file": (filename, image_bytes, "application/octet-stream")}
     params = {
         "top_k": top_k,
-        "include_crop_images": "true",
-        "full_image_fallback": "false",
+        "include_crop_images": str(include_crop_images).lower(),
+        "full_image_fallback": str(full_image_fallback).lower(),
     }
     try:
         with httpx.Client(timeout=120.0) as client:

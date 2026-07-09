@@ -59,6 +59,7 @@ def update_collection_entry(
         JOIN identifications ON identifications.observation_id = observations.id
         WHERE photos.user_id = ?
             AND observations.status = 'confirmed'
+            AND observations.collected_at IS NOT NULL
             AND observations.deleted_at IS NULL
             AND photos.deleted_at IS NULL
             AND identifications.confirmed_species_id = ?

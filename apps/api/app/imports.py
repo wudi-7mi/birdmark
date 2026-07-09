@@ -130,6 +130,7 @@ def _process_import_batch(
                     filename=upload.filename,
                     contents=upload.contents,
                     top_k=top_k,
+                    auto_analyze=True,
                 )
             except PhotoAnalysisFailed as exc:
                 _mark_item_failed(

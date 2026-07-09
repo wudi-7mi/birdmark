@@ -1,0 +1,485 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		10A100000000000000000001 /* BirdmarkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B100000000000000000001 /* BirdmarkApp.swift */; };
+		10A100000000000000000002 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B100000000000000000002 /* RootView.swift */; };
+		10A100000000000000000003 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B100000000000000000003 /* MainTabView.swift */; };
+		10A100000000000000000004 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B100000000000000000004 /* AppConfig.swift */; };
+		10A100000000000000000005 /* LoadingStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B100000000000000000005 /* LoadingStateView.swift */; };
+		10A100000000000000000006 /* BirdmarkModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B100000000000000000006 /* BirdmarkModels.swift */; };
+		10A100000000000000000007 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B100000000000000000007 /* APIClient.swift */; };
+		10A100000000000000000008 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B100000000000000000008 /* KeychainStore.swift */; };
+		10A100000000000000000009 /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B100000000000000000009 /* AuthStore.swift */; };
+		10A10000000000000000000A /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B10000000000000000000A /* AuthView.swift */; };
+		10A10000000000000000000B /* SharedPhotosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B10000000000000000000B /* SharedPhotosView.swift */; };
+		10A10000000000000000000C /* PhotoDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B10000000000000000000C /* PhotoDetailView.swift */; };
+		10A10000000000000000000D /* UploadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B10000000000000000000D /* UploadView.swift */; };
+		10A10000000000000000000E /* CollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B10000000000000000000E /* CollectionView.swift */; };
+		10A10000000000000000000F /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B10000000000000000000F /* ProfileView.swift */; };
+		10A100000000000000000013 /* ManualBoxEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B100000000000000000013 /* ManualBoxEditorView.swift */; };
+		10A100000000000000000010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 10B100000000000000000010 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		10B100000000000000000001 /* BirdmarkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BirdmarkApp.swift; sourceTree = "<group>"; };
+		10B100000000000000000002 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		10B100000000000000000003 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		10B100000000000000000004 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		10B100000000000000000005 /* LoadingStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingStateView.swift; sourceTree = "<group>"; };
+		10B100000000000000000006 /* BirdmarkModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BirdmarkModels.swift; sourceTree = "<group>"; };
+		10B100000000000000000007 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		10B100000000000000000008 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		10B100000000000000000009 /* AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
+		10B10000000000000000000A /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		10B10000000000000000000B /* SharedPhotosView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedPhotosView.swift; sourceTree = "<group>"; };
+		10B10000000000000000000C /* PhotoDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoDetailView.swift; sourceTree = "<group>"; };
+		10B10000000000000000000D /* UploadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadView.swift; sourceTree = "<group>"; };
+		10B10000000000000000000E /* CollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionView.swift; sourceTree = "<group>"; };
+		10B10000000000000000000F /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		10B100000000000000000010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		10B100000000000000000011 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		10B100000000000000000012 /* Birdmark.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Birdmark.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		10B100000000000000000013 /* ManualBoxEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualBoxEditorView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		10C100000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		10D100000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				10D100000000000000000002 /* Birdmark */,
+				10D10000000000000000000C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		10D100000000000000000002 /* Birdmark */ = {
+			isa = PBXGroup;
+			children = (
+				10D100000000000000000003 /* App */,
+				10D100000000000000000004 /* Core */,
+				10D100000000000000000005 /* Models */,
+				10D100000000000000000006 /* Services */,
+				10D100000000000000000007 /* Views */,
+				10B100000000000000000010 /* Assets.xcassets */,
+				10B100000000000000000011 /* Info.plist */,
+			);
+			path = Birdmark;
+			sourceTree = "<group>";
+		};
+		10D100000000000000000003 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				10B100000000000000000001 /* BirdmarkApp.swift */,
+				10B100000000000000000002 /* RootView.swift */,
+				10B100000000000000000003 /* MainTabView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		10D100000000000000000004 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				10B100000000000000000004 /* AppConfig.swift */,
+				10B100000000000000000005 /* LoadingStateView.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		10D100000000000000000005 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				10B100000000000000000006 /* BirdmarkModels.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		10D100000000000000000006 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				10B100000000000000000007 /* APIClient.swift */,
+				10B100000000000000000008 /* KeychainStore.swift */,
+				10B100000000000000000009 /* AuthStore.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		10D100000000000000000007 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				10D100000000000000000008 /* Auth */,
+				10D100000000000000000009 /* Photos */,
+				10D10000000000000000000A /* Upload */,
+				10D10000000000000000000B /* Collection */,
+				10D10000000000000000000D /* Profile */,
+				10D10000000000000000000E /* Shared */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		10D100000000000000000008 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				10B10000000000000000000A /* AuthView.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		10D100000000000000000009 /* Photos */ = {
+			isa = PBXGroup;
+			children = (
+				10B10000000000000000000B /* SharedPhotosView.swift */,
+				10B10000000000000000000C /* PhotoDetailView.swift */,
+			);
+			path = Photos;
+			sourceTree = "<group>";
+		};
+		10D10000000000000000000A /* Upload */ = {
+			isa = PBXGroup;
+			children = (
+				10B10000000000000000000D /* UploadView.swift */,
+			);
+			path = Upload;
+			sourceTree = "<group>";
+		};
+		10D10000000000000000000B /* Collection */ = {
+			isa = PBXGroup;
+			children = (
+				10B10000000000000000000E /* CollectionView.swift */,
+			);
+			path = Collection;
+			sourceTree = "<group>";
+		};
+		10D10000000000000000000C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				10B100000000000000000012 /* Birdmark.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		10D10000000000000000000D /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				10B10000000000000000000F /* ProfileView.swift */,
+			);
+			path = Profile;
+			sourceTree = "<group>";
+		};
+		10D10000000000000000000E /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				10B100000000000000000013 /* ManualBoxEditorView.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		10E100000000000000000001 /* Birdmark */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 10I100000000000000000003 /* Build configuration list for PBXNativeTarget "Birdmark" */;
+			buildPhases = (
+				10F100000000000000000001 /* Sources */,
+				10C100000000000000000001 /* Frameworks */,
+				10F100000000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Birdmark;
+			productName = Birdmark;
+			productReference = 10B100000000000000000012 /* Birdmark.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		10P100000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1630;
+				LastUpgradeCheck = 1630;
+				TargetAttributes = {
+					10E100000000000000000001 = {
+						CreatedOnToolsVersion = 16.3;
+					};
+				};
+			};
+			buildConfigurationList = 10I100000000000000000001 /* Build configuration list for PBXProject "Birdmark" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				zh-Hans,
+			);
+			mainGroup = 10D100000000000000000001;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 10D10000000000000000000C /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				10E100000000000000000001 /* Birdmark */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		10F100000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				10A100000000000000000010 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		10F100000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				10A100000000000000000001 /* BirdmarkApp.swift in Sources */,
+				10A100000000000000000002 /* RootView.swift in Sources */,
+				10A100000000000000000003 /* MainTabView.swift in Sources */,
+				10A100000000000000000004 /* AppConfig.swift in Sources */,
+				10A100000000000000000005 /* LoadingStateView.swift in Sources */,
+				10A100000000000000000006 /* BirdmarkModels.swift in Sources */,
+				10A100000000000000000007 /* APIClient.swift in Sources */,
+				10A100000000000000000008 /* KeychainStore.swift in Sources */,
+				10A100000000000000000009 /* AuthStore.swift in Sources */,
+				10A10000000000000000000A /* AuthView.swift in Sources */,
+				10A10000000000000000000B /* SharedPhotosView.swift in Sources */,
+				10A10000000000000000000C /* PhotoDetailView.swift in Sources */,
+				10A10000000000000000000D /* UploadView.swift in Sources */,
+				10A10000000000000000000E /* CollectionView.swift in Sources */,
+				10A10000000000000000000F /* ProfileView.swift in Sources */,
+				10A100000000000000000013 /* ManualBoxEditorView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		10H100000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		10H100000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		10H100000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Birdmark/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.birdmark.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		10H100000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Birdmark/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.birdmark.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		10I100000000000000000001 /* Build configuration list for PBXProject "Birdmark" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				10H100000000000000000001 /* Debug */,
+				10H100000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		10I100000000000000000003 /* Build configuration list for PBXNativeTarget "Birdmark" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				10H100000000000000000003 /* Debug */,
+				10H100000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 10P100000000000000000001 /* Project object */;
+}

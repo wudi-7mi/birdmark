@@ -91,6 +91,8 @@ CREATE TABLE IF NOT EXISTS bird_observations (
     status TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    collected_by_user_id INTEGER REFERENCES users(id),
+    collected_at TEXT,
     deleted_at TEXT
 );
 
@@ -144,8 +146,68 @@ def initialize_database() -> None:
     settings.database_path.parent.mkdir(parents=True, exist_ok=True)
     with connect() as db:
         db.executescript(SCHEMA)
+        migrate_database(db)
         ensure_default_user(db)
         db.commit()
+
+
+def migrate_database(db: sqlite3.Connection) -> None:
+    _ensure_column(
+        db,
+        table="bird_observations",
+        column="collected_by_user_id",
+        ddl="ALTER TABLE bird_observations ADD COLUMN collected_by_user_id INTEGER REFERENCES users(id)",
+    )
+    _ensure_column(
+        db,
+        table="bird_observations",
+        column="collected_at",
+        ddl="ALTER TABLE bird_observations ADD COLUMN collected_at TEXT",
+    )
+    db.execute(
+        """
+        UPDATE bird_observations
+        SET collected_by_user_id = COALESCE(
+                collected_by_user_id,
+                (SELECT photos.user_id FROM photos WHERE photos.id = bird_observations.photo_id)
+            ),
+            collected_at = COALESCE(
+                collected_at,
+                (
+                    SELECT identifications.confirmed_at
+                    FROM identifications
+                    WHERE identifications.observation_id = bird_observations.id
+                        AND identifications.confirmed_species_id IS NOT NULL
+                    ORDER BY identifications.id DESC
+                    LIMIT 1
+                ),
+                CURRENT_TIMESTAMP
+            )
+        WHERE collected_at IS NULL
+            AND status = 'confirmed'
+            AND EXISTS (
+                SELECT 1
+                FROM identifications
+                WHERE identifications.observation_id = bird_observations.id
+                    AND identifications.confirmed_species_id IS NOT NULL
+            )
+        """
+    )
+
+
+def _ensure_column(
+    db: sqlite3.Connection,
+    *,
+    table: str,
+    column: str,
+    ddl: str,
+) -> None:
+    existing_columns = {
+        str(row["name"])
+        for row in db.execute(f"PRAGMA table_info({table})").fetchall()
+    }
+    if column not in existing_columns:
+        db.execute(ddl)
 
 
 @contextmanager

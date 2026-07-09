@@ -8,14 +8,20 @@ def ensure_species_for_prediction(
     db: sqlite3.Connection,
     prediction: dict[str, Any],
 ) -> int | None:
-    scientific_name = prediction.get("species")
+    scientific_name = (
+        prediction.get("species")
+        or prediction.get("scientific_name")
+        or prediction.get("scientificName")
+        or prediction.get("label")
+    )
     if not scientific_name:
         return None
 
     return ensure_species(
         db,
         scientific_name=scientific_name,
-        common_name=prediction.get("common_name"),
+        common_name=prediction.get("common_name") or prediction.get("commonName"),
+        chinese_name=prediction.get("chinese_name") or prediction.get("chineseName"),
         genus=prediction.get("genus"),
         family=prediction.get("family"),
         source="bioclip",

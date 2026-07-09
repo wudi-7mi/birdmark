@@ -15,7 +15,15 @@ from .database import (
 )
 from .inference_client import InferenceClientError, analyze_image
 from .species import ensure_species_for_prediction
-from .storage import media_url, prepare_upload, save_crop_base64, save_original, save_thumbnail
+from .storage import (
+    media_url,
+    prepare_upload,
+    save_crop_base64,
+    save_observation_context_preview,
+    save_observation_context_previews,
+    save_original,
+    save_thumbnail,
+)
 
 
 router = APIRouter(tags=["photos"])
@@ -60,7 +68,8 @@ def list_photos(
 @router.post("/photos")
 def create_photo(
     file: Annotated[UploadFile, File()],
-    top_k: int = 5,
+    top_k: int = Query(default=5, ge=1, le=20),
+    auto_analyze: bool = Query(default=True),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, Any]:
     contents = file.file.read()
@@ -70,6 +79,7 @@ def create_photo(
             filename=file.filename,
             contents=contents,
             top_k=top_k,
+            auto_analyze=auto_analyze,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -103,17 +113,26 @@ def get_photo(
         if photo is None:
             raise HTTPException(status_code=404, detail="Photo not found")
 
+        observation_rows = db.execute(
+            """
+            SELECT *
+            FROM bird_observations
+            WHERE photo_id = ? AND deleted_at IS NULL
+            ORDER BY id ASC
+            """,
+            (photo_id,),
+        ).fetchall()
+        context_paths = save_observation_context_previews(
+            photo=photo,
+            observations=[dict(row) for row in observation_rows],
+        )
         observations = [
-            _build_observation(db, row)
-            for row in db.execute(
-                """
-                SELECT *
-                FROM bird_observations
-                WHERE photo_id = ? AND deleted_at IS NULL
-                ORDER BY id ASC
-                """,
-                (photo_id,),
-            ).fetchall()
+            _build_observation(
+                db,
+                row,
+                context_path=context_paths.get(int(row["id"])),
+            )
+            for row in observation_rows
         ]
 
     return _build_photo_response(photo, observations)
@@ -225,6 +244,7 @@ def ingest_photo_contents(
     filename: str | None,
     contents: bytes,
     top_k: int,
+    auto_analyze: bool = True,
 ) -> int:
     if not contents:
         raise ValueError("Uploaded file is empty")
@@ -242,12 +262,18 @@ def ingest_photo_contents(
         db.execute(
             """
             UPDATE photos
-            SET original_path = ?, thumb_path = ?, updated_at = CURRENT_TIMESTAMP
+            SET original_path = ?,
+                thumb_path = ?,
+                status = ?,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
             """,
-            (original_path, thumb_path, photo_id),
+            (original_path, thumb_path, "processing" if auto_analyze else "ready", photo_id),
         )
         db.commit()
+
+    if not auto_analyze:
+        return photo_id
 
     try:
         inference_result = analyze_image(
@@ -318,8 +344,19 @@ def _save_inference_result(
     photo_id: int,
     result: dict[str, Any],
 ) -> None:
+    photo = row_to_dict(
+        db.execute(
+            "SELECT * FROM photos WHERE id = ?",
+            (photo_id,),
+        ).fetchone()
+    )
+    observations_for_context: list[dict[str, Any]] = []
     for item in result.get("results", []):
         box = item.get("box") or [0, 0, 0, 0]
+        bbox_x1 = int(box[0])
+        bbox_y1 = int(box[1])
+        bbox_x2 = int(box[2])
+        bbox_y2 = int(box[3])
         cursor = db.execute(
             """
             INSERT INTO bird_observations (
@@ -331,15 +368,24 @@ def _save_inference_result(
             (
                 photo_id,
                 "",
-                int(box[0]),
-                int(box[1]),
-                int(box[2]),
-                int(box[3]),
+                bbox_x1,
+                bbox_y1,
+                bbox_x2,
+                bbox_y2,
                 item.get("detection_confidence"),
                 item.get("source") or "detector",
             ),
         )
         observation_id = int(cursor.lastrowid)
+        observations_for_context.append(
+            {
+                "id": observation_id,
+                "bbox_x1": bbox_x1,
+                "bbox_y1": bbox_y1,
+                "bbox_x2": bbox_x2,
+                "bbox_y2": bbox_y2,
+            }
+        )
 
         crop_image = item.get("crop_image") or {}
         crop_path = ""
@@ -366,12 +412,17 @@ def _save_inference_result(
             """,
             (observation_id, dumps_json(predictions), suggested_species_id),
         )
+    if photo is not None:
+        save_observation_context_previews(
+            photo=photo,
+            observations=observations_for_context,
+        )
 
 
 def _build_photo_detail(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     photo = dict(row)
     observations = [
-        _build_observation(db, observation_row)
+        _build_observation(db, observation_row, photo=photo, include_context_preview=False)
         for observation_row in db.execute(
             """
             SELECT *
@@ -385,8 +436,20 @@ def _build_photo_detail(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, A
     return _build_photo_response(photo, observations)
 
 
-def _build_observation(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
+def _build_observation(
+    db: sqlite3.Connection,
+    row: sqlite3.Row,
+    *,
+    photo: dict[str, Any] | None = None,
+    include_context_preview: bool = False,
+    context_path: str | None = None,
+) -> dict[str, Any]:
     observation = dict(row)
+    context_path = context_path or (
+        save_observation_context_preview(photo=photo, observation=observation)
+        if include_context_preview and photo is not None
+        else None
+    )
     identification = row_to_dict(
         db.execute(
             """
@@ -413,6 +476,7 @@ def _build_observation(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, An
     return {
         **observation,
         "crop_url": media_url(observation.get("crop_path")),
+        "context_url": media_url(context_path),
         "identification": identification,
     }
 
